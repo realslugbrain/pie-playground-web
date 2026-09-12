@@ -799,7 +799,7 @@ function slurp(ptr) {
 function runPie(source) {
   const exp = instance.exports;
   const src = enc.encode(source);
-  const OUT = 65536, ERR = 16384;
+  const OUT = 2097152, ERR = 16384;
   const pSrc = exp.malloc(src.length + 1);
   const pOut = exp.malloc(OUT);
   const pErr = exp.malloc(ERR);
@@ -881,7 +881,14 @@ $("run").addEventListener("click", () => {
   $("run").disabled = true;
   try {
     const t0 = performance.now();
-    const { rc, out, err } = runPie($("src").value);
+    let { rc, out, err } = runPie($("src").value);
+    const undecl = err.match(/undeclared (?:function|name) '([^']+)'/);
+    if (undecl && BUILTINS.includes(undecl[1])) {
+      if (err.length > 0 && !err.endsWith("\n")) err += "\n";
+      err += "[playground: '" + undecl[1] +
+        "' lives in the standard library, which needs `import` — " +
+        "unavailable here (no filesystem)]\n";
+    }
     const ms = (performance.now() - t0).toFixed(1);
     $("stdout").textContent = out;
     $("stderr").textContent = err;
