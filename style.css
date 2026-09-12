@@ -259,8 +259,10 @@ textarea::selection {
     z-index: 10;
     display: none;
     background: var(--surface);
+    background: color-mix(in srgb, var(--surface) 86%, transparent);
+    backdrop-filter: blur(6px);
     border: 1px solid var(--border);
-    max-height: 40vh;
+    max-height: min(12em, 40vh);
     overflow-y: auto;
     min-width: 140px;
     max-width: 90%;

@@ -338,13 +338,9 @@ function refreshPopup() {
   const fr = frame.getBoundingClientRect();
   popup.style.display = "block";
   const popH = popup.offsetHeight;
-  const below = fr.bottom - p.y - lineH;
-  const above = p.y - fr.top;
-  let top;
-  if (below >= popH || below >= above) {
-    top = p.y - fr.top + lineH;
-  } else {
-    top = Math.max(0, p.y - fr.top - popH);
+  let top = p.y - fr.top + lineH;
+  if (p.y + lineH + popH > window.innerHeight && p.y - popH >= 0) {
+    top = p.y - fr.top - popH;
   }
   popup.style.top = top + "px";
   popup.style.left =
@@ -861,6 +857,12 @@ async function boot() {
         return 0;
       },
       fd_close: () => 0,
+      fd_fdstat_get: () => 8,
+      fd_fdstat_set_flags: () => 0,
+      fd_readdir: () => 8,
+      path_open: () => 44,
+      path_filestat_get: () => 44,
+      path_readlink: () => 44,
       fd_seek: (fd, offLo, offHi, whence, outPtr) => {
         view().setBigUint64(outPtr, 0n, true);
         return 0;
@@ -881,14 +883,7 @@ $("run").addEventListener("click", () => {
   $("run").disabled = true;
   try {
     const t0 = performance.now();
-    let { rc, out, err } = runPie($("src").value);
-    const undecl = err.match(/undeclared (?:function|name) '([^']+)'/);
-    if (undecl && BUILTINS.includes(undecl[1])) {
-      if (err.length > 0 && !err.endsWith("\n")) err += "\n";
-      err += "[playground: '" + undecl[1] +
-        "' lives in the standard library, which needs `import` — " +
-        "unavailable here (no filesystem)]\n";
-    }
+    const { rc, out, err } = runPie($("src").value);
     const ms = (performance.now() - t0).toFixed(1);
     $("stdout").textContent = out;
     $("stderr").textContent = err;
