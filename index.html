@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pie-playground - in your browser</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="header-top">
+    <div class="site-brand">pie-playground</div>
+    <div>
+      <span class="status-badge">wasm</span>
+      <button class="theme-toggle" id="theme" aria-label="toggle color theme">light</button>
+    </div>
+  </div>
+</header>
+<div class="tab-bar" role="tablist" aria-label="example programs">
+  <button class="tab-btn active" data-ex="hello" role="tab">hello world</button>
+  <button class="tab-btn" data-ex="fact" role="tab">factorial</button>
+  <button class="tab-btn" data-ex="fib" role="tab">fibonacci</button>
+  <button class="tab-btn" data-ex="fizzbuzz" role="tab">fizzbuzz</button>
+  <button class="tab-btn" data-ex="gcd" role="tab">gcd</button>
+  <button class="tab-btn" data-ex="strings" role="tab">string compare</button>
+  <button class="tab-btn" data-ex="struct" role="tab">struct</button>
+  <button class="tab-btn" data-ex="match" role="tab">match</button>
+</div>
+<div class="code-frame">
+  <div class="code-header"><span id="filename">hello world</span><span><button class="copy-btn" id="copy">[copy]</button> <button class="copy-btn" id="link">[link]</button></span></div>
+  <div class="editor-wrap">
+    <pre id="backdrop" aria-hidden="true"></pre>
+    <textarea id="src" spellcheck="false" autocomplete="off"
+      autocapitalize="off" autocorrect="off"
+      enterkeyhint="enter" aria-label="Pie source code"></textarea>
+  </div>
+  <ul id="complete" role="listbox" aria-label="completions"></ul>
+</div>
+<button id="run" class="btn-primary" disabled>loading…</button>
+<button id="auto" class="toggle-btn" aria-pressed="false">auto: off</button>
+<div id="status"><span id="msg"></span><span class="pos" id="pos"></span></div>
+<div class="code-frame">
+  <div class="code-header"><span>stdout</span></div>
+  <pre id="stdout"></pre>
+</div>
+<div class="code-frame">
+  <div class="code-header"><span>stderr</span></div>
+  <pre id="stderr"></pre>
+</div>
+<p class="hint"><kbd>Tab</kbd> indent · <kbd>↑↓</kbd> + <kbd>Enter</kbd> complete · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> run</p>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+const ta = $("src");
+const popup = $("complete");
+const backdrop = $("backdrop");
+let instance = null;
+
+const KEYWORDS = ["fn", "let", "ret", "return", "if", "else", "while",
+  "for", "in", "struct", "enum", "match", "type", "import", "module",
+  "pure", "Pure", "pub", "trait", "impl", "extern", "defer", "move",
+  "tail", "asm", "io", "IO", "secret", "dyn", "async", "unsafe", "break",
+  "continue", "end", "true", "false", "maybe", "null"];
+const BUILTINS = ["region_alloc", "region_realloc", "region_promote",
+  "region_leave", "print_str", "print_int", "string_hash",
+  "string_equals", "file_open", "file_write", "file_read", "file_close",
+  "println", "print", "pool_alloc", "pool_free", "io_stdin", "io_stdout",
+  "io_stderr", "input", "to_int", "io_isatty", "terminal_red",
+  "terminal_green", "terminal_yellow", "terminal_blue", "terminal_bold",
+  "strip_ansi", "io_enable_raw_mode", "io_disable_raw_mode",
+  "io_read_char", "pool_alloc_handle", "pool_get_handle", "time_now",
+  "time_sleep", "env_argc", "env_argv", "env_get_var", "env_set_var",
+  "env_remove_var", "env_has_var", "env_current_dir", "process_new",
+  "process_add_arg", "process_spawn", "process_wait", "process_kill",
+  "process_output", "process_config_stdio", "process_spawn_piped",
+  "process_write_pipe", "process_read_pipe", "process_exit_status",
+  "process_write_stdin", "process_read_stdout", "math_tan_f64",
+  "math_atan2_f64", "math_asin_f64", "math_acos_f64", "math_atan_f64",
+  "bit_lshr_i64", "io_csprng_bytes", "unicode_decode",
+  "unicode_grapheme_count", "unicode_graphemes", "unicode_uppercase",
+  "unicode_lowercase", "type_size", "type_align", "async_scope_enter",
+  "async_scope_spawn", "async_scope_wait", "async_reactor_init",
+  "async_reactor_register", "async_reactor_poll", "thread_spawn",
+  "thread_join", "channel_create", "channel_send", "channel_recv",
+  "atomic_new_i64", "atomic_load_i64", "atomic_store_i64",
+  "atomic_add_i64", "atomic_cas_i64", "json_parse_int_field",
+  "json_escape_str", "abort", "print_err", "print_err_i64",
+  "print_err_bool", "fs_exists", "fs_read_string", "fs_write_string",
+  "fs_remove_file", "fs_create_dir", "fs_remove_dir", "fs_read_dir",
+  "http_get", "http_post", "http_server_create", "http_server_listen",
+  "http_server_destroy", "http_build_response", "http_server_set_file",
+  "shutdown_init", "shutdown_requested", "shutdown_request",
+  "shutdown_wait", "http_server_set_tls", "http_server_has_tls",
+  "http_server_enable_http2", "http_server_has_http2",
+  "ws_upgrade_response", "ws_encode_frame", "ws_decode_frame",
+  "http_server_add_middleware", "cookie_parse", "cookie_set",
+  "cors_headers", "rate_limiter_init", "rate_limiter_check",
+  "template_render", "http_server_set_static_dir", "ssr_context_init",
+  "ssr_context_add", "ssr_render_file", "ssr_render",
+  "http_server_add_route", "sha1", "base64_encode",
+  "build_cors_middleware", "build_logging_middleware",
+  "h2_default_settings", "h2_connection_create", "h2_connection_feed",
+  "h2_connection_flush", "h2_connection_alive", "h2_connection_destroy",
+  "h2_send_response", "h2_server_push", "h3_is_available",
+  "h3_server_create", "h3_server_run", "h3_server_stop",
+  "h3_server_destroy", "h3_send_response", "h3_connection_alive",
+  "h3_connection_destroy", "reflect_type_name", "reflect_field_count",
+  "reflect_field_name_at", "reflect_field_type_at", "reflect_size_of",
+  "reflect_align_of", "reflect_debug_dump", "reflect_for_each_field",
+  "ptr_to_string", "len", "push", "pop", "get", "set", "insert",
+  "contains", "remove", "open", "create", "close", "read", "write",
+  "to_string", "to_float", "append", "concat", "slice", "trim", "sort",
+  "reverse", "map", "filter", "reduce", "panic", "assert", "require"];
+const WORDS = KEYWORDS.map((w) => ({ w, kind: "kw" }))
+  .concat(BUILTINS.map((w) => ({ w, kind: "fn" })));
+
+const EXAMPLES = {
+  hello: 'fn main() -> int:\n    println("hello from wasm")\n    println(40 + 2)\n    return 0\nend\n',
+  fact: 'fn main() -> int:\n    acc: int -> 1\n    for i in 1..10:\n        acc <- acc * i\n    end\n    println(acc)\n    return 0\nend\n',
+  fib: 'fn main() -> int:\n    a: int -> 0\n    b: int -> 1\n    for i in 0..10:\n        println(a)\n        t: int -> a + b\n        a <- b\n        b <- t\n    end\n    return 0\nend\n',
+  fizzbuzz: 'fn main() -> int:\n    for i in 1..16:\n        if i % 15 == 0:\n            println("fizzbuzz")\n        else:\n            if i % 3 == 0:\n                println("fizz")\n            else:\n                if i % 5 == 0:\n                    println("buzz")\n                else:\n                    println(i)\n                end\n            end\n        end\n    end\n    return 0\nend\n',
+  gcd: 'fn gcd(a: int, b: int) -> int:\n    if b == 0:\n        return a\n    end\n    return gcd(b, a % b)\nend\nfn main() -> int:\n    println(gcd(48, 18))\n    return 0\nend\n',
+  strings: 'fn main() -> int:\n    print("apple" < "banana")\n    print("banana" > "apple")\n    return 0\nend\n',
+  struct: 'struct Point:\n    x: int\n    y: int\nend\nimpl Point:\n    fn norm2(self) -> int:\n        return self.x * self.x + self.y * self.y\n    end\nend\nfn main() -> int:\n    p: Point -> Point{ x -> 3, y -> 4 }\n    println(p.norm2())\n    return 0\nend\n',
+  match: 'enum Shape:\n    Circle(r: int)\n    Rectangle(w: int, h: int)\nend\nfn area2(s: Shape) -> int:\n    match s:\n        Circle(r) => return 3 * r * r\n        Rectangle(w, h) => return w * h\n    end\n    return 0 - 1\nend\nfn main() -> int:\n    println(area2(Shape::Circle(2)))\n    println(area2(Shape::Rectangle(3, 4)))\n    return 0\nend\n',
+};
+
+const HL_CONSTANTS = ["true", "false", "maybe", "null"];
+const HL_TYPES = ["int", "float", "double", "string", "bool", "char", "void"];
+const HL_BUILTIN_TYPES = ["Option", "Result", "List", "HashMap",
+  "SmallList", "Vec", "Range", "Slice", "Set"];
+const HL_KEYWORDS = KEYWORDS.filter((k) => HL_CONSTANTS.indexOf(k) === -1);
+const HL_RE = new RegExp(
+  "(\\/\\/[^\\n]*)" +
+  '|("(?:[^"\\\\\\n]|\\\\.)*")' +
+  "|\\b(0x[0-9a-fA-F]+|0b[01]+|0o[0-7]+|\\d+\\.\\d+|\\d+)\\b" +
+  "|\\b(" + HL_CONSTANTS.join("|") + ")\\b" +
+  "|\\b(" + HL_KEYWORDS.join("|") + ")\\b" +
+  "|\\b(" + HL_TYPES.join("|") + ")\\b" +
+  "|\\b(" + HL_BUILTIN_TYPES.join("|") + ")\\b" +
+  "|(!\\[[A-Za-z]+\\])" +
+  "|(->|<-|==|!=|<=|>=|\\.\\.|\\/(?![\\/\\n])|[+\\-*%<>!?=])" +
+  "|([A-Za-z_][A-Za-z0-9_]*)(?=\\s*\\()"
+  , "g");
+
+function escHtml(s) {
+  return s.replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function highlightPie(src) {
+  return src.replace(HL_RE, (m, cmt, str, num, cst, kw, typ, bty, eff,
+      op, fn) => {
+    if (cmt) return '<span class="tok-cmt">' + escHtml(cmt) + "</span>";
+    if (str) {
+      const inner = escHtml(str).replace(/\\./g,
+        (e) => '<span class="tok-esc">' + e + "</span>");
+      return '<span class="tok-str">' + inner + "</span>";
+    }
+    if (num) return '<span class="tok-num">' + escHtml(num) + "</span>";
+    if (cst) return '<span class="tok-bool">' + escHtml(cst) + "</span>";
+    if (kw) return '<span class="tok-kw">' + escHtml(kw) + "</span>";
+    if (typ) return '<span class="tok-type">' + escHtml(typ) + "</span>";
+    if (bty) return '<span class="tok-bty">' + escHtml(bty) + "</span>";
+    if (eff) return '<span class="tok-eff">' + escHtml(eff) + "</span>";
+    if (op) return '<span class="tok-op">' + escHtml(op) + "</span>";
+    if (fn) return '<span class="tok-fn">' + escHtml(fn) + "</span>";
+    return escHtml(m);
+  });
+}
+
+function renderHighlight() {
+  backdrop.innerHTML = highlightPie(ta.value);
+  syncScroll();
+}
+
+function syncScroll() {
+  backdrop.style.transform =
+    "translate(" + (-ta.scrollLeft) + "px," + (-ta.scrollTop) + "px)";
+}
+
+function autosize() {
+  ta.style.height = "auto";
+  ta.style.height = ta.scrollHeight + "px";
+}
+
+const mirror = document.createElement("div");
+(function initMirror() {
+  const st = getComputedStyle(ta);
+  const props = ["fontFamily", "fontSize", "lineHeight", "paddingTop",
+    "paddingLeft", "paddingRight", "borderTopWidth", "borderLeftWidth",
+    "whiteSpace", "wordWrap", "letterSpacing", "fontKerning",
+    "fontVariantLigatures"];
+  for (const p of props) mirror.style[p] = st[p];
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.top = "0";
+  mirror.style.left = "0";
+  mirror.style.width = ta.clientWidth + "px";
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.wordWrap = "break-word";
+  document.body.appendChild(mirror);
+})();
+
+function caretXY() {
+  mirror.style.width = ta.clientWidth + "px";
+  mirror.textContent = ta.value.slice(0, ta.selectionStart);
+  const dot = document.createElement("span");
+  dot.textContent = "\u200b";
+  mirror.appendChild(dot);
+  const wrap = ta.getBoundingClientRect();
+  const r = dot.getBoundingClientRect();
+  const m = mirror.getBoundingClientRect();
+  return {
+    x: wrap.left + (r.left - m.left) - ta.scrollLeft,
+    y: wrap.top + (r.top - m.top) - ta.scrollTop,
+  };
+}
+
+let items = [];
+let active = -1;
+
+function collectLocals() {
+  const src = ta.value;
+  const seen = new Map();
+  let order = 0;
+  const add = (name, kind) => {
+    if (!seen.has(name)) seen.set(name, { kind, order: order++ });
+  };
+  let m;
+  const fnRe = /\bfn\s+([A-Za-z_][A-Za-z0-9_]*)/g;
+  while ((m = fnRe.exec(src))) add(m[1], "fn");
+  const typeRe = /\b(?:struct|enum)\s+([A-Za-z_][A-Za-z0-9_]*)/g;
+  while ((m = typeRe.exec(src))) add(m[1], "type");
+  const varRe = /(^|\n)\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/g;
+  while ((m = varRe.exec(src))) add(m[2], "var");
+  const forRe = /\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b/g;
+  while ((m = forRe.exec(src))) add(m[1], "var");
+  return seen;
+}
+
+function inCodeContext() {
+  const pos = ta.selectionStart;
+  const ls = ta.value.lastIndexOf("\n", pos - 1) + 1;
+  const line = ta.value.slice(ls, pos);
+  let quote = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quote !== null) {
+      if (c === "\\") i++;
+      else if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") {
+      quote = c;
+    } else if (c === "/" && line[i + 1] === "/") {
+      return false;
+    }
+  }
+  return quote === null;
+}
+
+function currentWord() {
+  const pos = ta.selectionStart;
+  const left = ta.value.slice(0, pos);
+  const m = left.match(/[A-Za-z_][A-Za-z0-9_]*$/);
+  return m ? { word: m[0], start: pos - m[0].length } : null;
+}
+
+function hidePopup() {
+  popup.style.display = "none";
+  items = [];
+  active = -1;
+}
+
+function renderPopup() {
+  popup.innerHTML = "";
+  items.forEach((it, i) => {
+    const li = document.createElement("li");
+    li.textContent = it.w;
+    const kind = document.createElement("span");
+    kind.className = "kind";
+    kind.textContent = it.kind;
+    li.appendChild(kind);
+    li.setAttribute("role", "option");
+    if (i === active) {
+      li.classList.add("active");
+      li.setAttribute("aria-selected", "true");
+    }
+    li.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      active = i;
+      acceptPopup();
+    });
+    popup.appendChild(li);
+  });
+}
+
+function refreshPopup() {
+  const cw = currentWord();
+  if (!cw || cw.word.length < 2 || document.activeElement !== ta ||
+      !inCodeContext()) {
+    hidePopup();
+    return;
+  }
+  const pre = cw.word;
+  const locals = collectLocals();
+  const starts = [];
+  const contains = [];
+  const seenLocal = {};
+  locals.forEach((info, name) => {
+    if (name === pre || seenLocal[name]) return;
+    seenLocal[name] = true;
+    if (name.startsWith(pre)) {
+      starts.push({ w: name, kind: info.kind, order: info.order });
+    } else if (name.indexOf(pre) !== -1) {
+      contains.push({ w: name, kind: info.kind, order: info.order });
+    }
+  });
+  starts.sort((a, b) => b.order - a.order);
+  contains.sort((a, b) => b.order - a.order);
+  const globals = WORDS.filter(
+    (it) => it.w.startsWith(pre) && it.w !== pre && !seenLocal[it.w]);
+  globals.sort((a, b) => (a.w < b.w ? -1 : 1));
+
+  const matches = starts.concat(globals, contains).slice(0, 8);
+  if (matches.length === 0) {
+    hidePopup();
+    return;
+  }
+  items = matches;
+  active = 0;
+  renderPopup();
+  const p = caretXY();
+  const lineH = parseFloat(getComputedStyle(ta).lineHeight) || 24;
+  const frame = ta.closest(".code-frame");
+  const fr = frame.getBoundingClientRect();
+  popup.style.display = "block";
+  const popH = popup.offsetHeight;
+  const below = fr.bottom - p.y - lineH;
+  const above = p.y - fr.top;
+  let top;
+  if (below >= popH || below >= above) {
+    top = p.y - fr.top + lineH;
+  } else {
+    top = Math.max(0, p.y - fr.top - popH);
+  }
+  popup.style.top = top + "px";
+  popup.style.left =
+    Math.max(0, Math.min(p.x - fr.left, frame.clientWidth - 160)) + "px";
+}
+
+function acceptPopup() {
+  if (active < 0 || active >= items.length) {
+    hidePopup();
+    return;
+  }
+  const cw = currentWord();
+  if (cw) {
+    ta.setRangeText(items[active].w, cw.start, ta.selectionStart, "end");
+  }
+  hidePopup();
+  renderHighlight();
+  updateStatus();
+  scheduleAuto();
+  scheduleShare();
+}
+
+function indentSelection(dedent) {
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const v = ta.value;
+  const ls = v.lastIndexOf("\n", start - 1) + 1;
+  let le = v.indexOf("\n", end);
+  if (le === -1) le = v.length;
+  const block = v.slice(ls, le);
+  const lines = block.split("\n");
+  const next = lines.map((ln) =>
+    dedent ? ln.replace(/^    /, "") : "    " + ln).join("\n");
+  ta.setRangeText(next, ls, le, "end");
+  const delta = next.length - block.length;
+  ta.selectionStart = start + (dedent ? 0 : 4);
+  ta.selectionEnd = end + delta;
+  renderHighlight();
+  updateStatus();
+}
+
+function autoIndent() {
+  const pos = ta.selectionStart;
+  const v = ta.value;
+  const ls = v.lastIndexOf("\n", pos - 1) + 1;
+  const line = v.slice(ls, pos);
+  const indent = (line.match(/^ */) || [""])[0];
+  ta.setRangeText("\n" + indent, pos, ta.selectionEnd, "end");
+  renderHighlight();
+  updateStatus();
+  scheduleAuto();
+  scheduleShare();
+}
+
+ta.addEventListener("keydown", (e) => {
+  if (popup.style.display === "block") {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      active = (active + (e.key === "ArrowDown" ? 1 : items.length - 1)) %
+        items.length;
+      renderPopup();
+      return;
+    }
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      acceptPopup();
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      hidePopup();
+      return;
+    }
+  }
+  if (e.key === "Tab") {
+    e.preventDefault();
+    if (!e.shiftKey && ta.selectionStart === ta.selectionEnd) {
+      ta.setRangeText("    ", ta.selectionStart, ta.selectionEnd, "end");
+      renderHighlight();
+      updateStatus();
+      scheduleAuto();
+  scheduleShare();
+    } else {
+      indentSelection(e.shiftKey);
+    }
+    scheduleAuto();
+  scheduleShare();
+    return;
+  }
+  if (e.key === "Enter" && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    autoIndent();
+    return;
+  }
+});
+
+ta.addEventListener("input", () => {
+  autosize();
+  renderHighlight();
+  refreshPopup();
+  updateStatus();
+  scheduleAuto();
+  scheduleShare();
+});
+ta.addEventListener("scroll", () => {
+  syncScroll();
+  hidePopup();
+});
+ta.addEventListener("click", updateStatus);
+ta.addEventListener("keyup", (e) => {
+  if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+    hidePopup();
+  }
+  updateStatus();
+});
+ta.addEventListener("blur", hidePopup);
+window.addEventListener("resize", () => {
+  renderHighlight();
+  if (popup.style.display === "block") refreshPopup();
+});
+
+function updateStatus() {
+  const pos = ta.selectionStart;
+  const upto = ta.value.slice(0, pos);
+  const line = upto.split("\n").length;
+  const col = pos - upto.lastIndexOf("\n");
+  $("pos").textContent =
+    "Ln " + line + ", Col " + col + " · " + ta.value.length + " chars";
+}
+
+const tabBtns = Array.prototype.slice.call(
+  document.querySelectorAll(".tab-btn"));
+tabBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    tabBtns.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    $("filename").textContent = btn.textContent;
+    ta.value = EXAMPLES[btn.getAttribute("data-ex")] || "";
+    autosize();
+    hidePopup();
+    renderHighlight();
+    updateStatus();
+    scheduleAuto();
+    scheduleShare();
+    ta.focus();
+  });
+});
+
+const SHARE_MAX_URL = 8000;
+const SHARE_MAX_BYTES = 4096;
+let shareTimer = 0;
+
+const PIEPACK_DICT =
+  "fn main() -> int:\n" +
+  "\n    return 0\nend\n" +
+  "\nend\n" +
+  "    println(" +
+  "        println(" +
+  "            println(" +
+  "    for i in " +
+  "    if " +
+  "    end\n" +
+  "        " +
+  "            " +
+  "    " +
+  "println(\"" +
+  "println" +
+  "print" +
+  "return " +
+  "match " +
+  "struct " +
+  "enum " +
+  "while " +
+  "impl " +
+  "else" +
+  "true" +
+  "false" +
+  "int" +
+  "float" +
+  "string" +
+  "bool" +
+  "end" +
+  "fn " +
+  "in " +
+  "if " +
+  "for " +
+  "self" +
+  "main" +
+  " => " +
+  " <- " +
+  " -> " +
+  "::" +
+  ".." +
+  "\")" +
+  "\"\"" +
+  "()" +
+  "{}" +
+  "\n" +
+  " + " +
+  " - " +
+  " * " +
+  " / " +
+  " % " +
+  " == " +
+  " != " +
+  " <= " +
+  " >= " +
+  "\"" +
+  "(" +
+  ")" +
+  "{" +
+  "}" +
+  ", " +
+  ": " +
+  "0" +
+  "1" +
+  "2";
+const PIEPACK_MINLEN = 3;
+const PIEPACK_MAXLEN = 34;
+const PIEPACK_WIN = 3072;
+
+function piepackEncodeBytes(src) {
+  const bits = [];
+  const push = (val, n) => {
+    for (let i = n - 1; i >= 0; i--) bits.push((val >> i) & 1);
+  };
+  let sum = 0;
+  for (let i = 0; i < src.length; i++) sum = (sum + src[i]) & 255;
+  push(src.length, 16);
+  push(sum, 8);
+  const dictLen = PIEPACK_DICT.length;
+  let i = 0;
+  while (i < src.length) {
+    let bestLen = 0, bestKind = 0, bestOff = 0;
+    for (let o = 0; o < dictLen; o++) {
+      let l = 0;
+      while (l < PIEPACK_MAXLEN && i + l < src.length &&
+             o + l < dictLen &&
+             PIEPACK_DICT.charCodeAt(o + l) === src[i + l]) l++;
+      if (l > bestLen) { bestLen = l; bestKind = 0; bestOff = o; }
+      if (bestLen === PIEPACK_MAXLEN) break;
+    }
+    const wfrom = Math.max(0, i - PIEPACK_WIN);
+    for (let o = wfrom; o < i; o++) {
+      let l = 0;
+      while (l < PIEPACK_MAXLEN && i + l < src.length &&
+             src[o + l] === src[i + l]) l++;
+      if (l > bestLen) { bestLen = l; bestKind = 1; bestOff = i - o; }
+      if (bestLen === PIEPACK_MAXLEN) break;
+    }
+    if (bestLen >= PIEPACK_MINLEN) {
+      push(1, 1);
+      push(bestKind, 1);
+      push(bestKind === 0 ? bestOff : bestOff - 1 + 1024, 12);
+      push(bestLen - PIEPACK_MINLEN, 5);
+      i += bestLen;
+    } else {
+      push(0, 1);
+      push(src[i], 8);
+      i++;
+    }
+  }
+  const out = new Uint8Array(Math.ceil(bits.length / 8));
+  for (let k = 0; k < bits.length; k++) {
+    if (bits[k]) out[k >> 3] |= 1 << (7 - (k & 7));
+  }
+  return out;
+}
+
+function piepackDecodeBytes(buf) {
+  const bits = [];
+  for (let b = 0; b < buf.length; b++) {
+    for (let i = 7; i >= 0; i--) bits.push((buf[b] >> i) & 1);
+  }
+  let p = 0;
+  const take = (n) => {
+    let v = 0;
+    for (let k = 0; k < n; k++) v = (v << 1) | (bits[p++] || 0);
+    return v;
+  };
+  const len = take(16);
+  const sum = take(8);
+  const dictLen = PIEPACK_DICT.length;
+  const out = [];
+  while (out.length < len) {
+    if (take(1) === 1) {
+      const kind = take(1);
+      const off = take(12);
+      const ln = take(5) + PIEPACK_MINLEN;
+      if (kind === 0) {
+        if (off + ln > dictLen) throw new Error("piepack: bad dict ref");
+        for (let k = 0; k < ln; k++) out.push(PIEPACK_DICT.charCodeAt(off + k));
+      } else {
+        const from = out.length - (off - 1024 + 1);
+        if (from < 0) throw new Error("piepack: bad window ref");
+        for (let k = 0; k < ln; k++) out.push(out[from + k]);
+      }
+    } else {
+      out.push(take(8));
+    }
+  }
+  let check = 0;
+  for (let k = 0; k < out.length; k++) check = (check + out[k]) & 255;
+  if (check !== sum) throw new Error("piepack: checksum mismatch");
+  return new Uint8Array(out);
+}
+
+function b64urlEncode(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function b64urlDecode(payload) {
+  let b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4 !== 0) b64 += "=";
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function inflateB64url(payload) {
+  let b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4 !== 0) b64 += "=";
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const stream = new Blob([bytes]).stream()
+    .pipeThrough(new DecompressionStream("deflate-raw"));
+  return await new Response(stream).text();
+}
+
+function scheduleShare() {
+  if (shareTimer) clearTimeout(shareTimer);
+  shareTimer = setTimeout(updateShareURL, 500);
+}
+
+async function updateShareURL() {
+  shareTimer = 0;
+  try {
+    const bytes = new TextEncoder().encode(ta.value);
+    if (bytes.length > SHARE_MAX_BYTES) return;
+    const payload = b64urlEncode(piepackEncodeBytes(bytes));
+    if (payload.length > SHARE_MAX_URL) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("code", payload);
+    window.history.replaceState(null, "", url);
+  } catch (e) {  }
+}
+
+async function loadSharedCode() {
+  try {
+    const params = new URL(window.location.href).searchParams;
+    const payload = params.get("code");
+    if (!payload) return false;
+    let text = null;
+    try {
+      text = new TextDecoder().decode(
+        piepackDecodeBytes(b64urlDecode(payload)));
+    } catch (e) {
+      try {
+        text = await inflateB64url(payload.replace(/^1_/, ""));
+      } catch (e2) {
+        return false;
+      }
+    }
+    if (typeof text !== "string" || text.length === 0) return false;
+    ta.value = text;
+    return true;
+  } catch (e) { return false; }
+}
+
+$("copy").addEventListener("click", () => {
+  const done = () => {
+    const btn = $("copy");
+    btn.textContent = "[copied!]";
+    setTimeout(() => { btn.textContent = "[copy]"; }, 1200);
+  };
+  const fallback = () => {
+    ta.focus();
+    ta.select();
+    try {
+      document.execCommand("copy");
+      done();
+    } catch (e) {  }
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ta.value).then(done, fallback);
+  } else {
+    fallback();
+  }
+});
+
+$("link").addEventListener("click", async () => {
+  if (shareTimer) {
+    clearTimeout(shareTimer);
+    shareTimer = 0;
+  }
+  await updateShareURL();
+  const done = () => {
+    const btn = $("link");
+    btn.textContent = "[copied!]";
+    setTimeout(() => { btn.textContent = "[link]"; }, 1200);
+  };
+  try {
+    await navigator.clipboard.writeText(window.location.href);
+    done();
+  } catch (e) {  }
+});
+
+(function initTheme() {
+  const root = document.documentElement;
+  let saved = null;
+  try {
+    saved = window.localStorage
+      ? window.localStorage.getItem("pie-theme")
+      : null;
+  } catch (e) {  }
+  const prefersLight = window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: light)").matches;
+  const theme = saved === "light" || saved === "dark"
+    ? saved
+    : (prefersLight ? "light" : "dark");
+  root.setAttribute("data-theme", theme);
+  $("theme").textContent = theme === "dark" ? "light" : "dark";
+  $("theme").addEventListener("click", () => {
+    const next = root.getAttribute("data-theme") === "dark"
+      ? "light"
+      : "dark";
+    root.setAttribute("data-theme", next);
+    $("theme").textContent = next === "dark" ? "light" : "dark";
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem("pie-theme", next);
+      }
+    } catch (e) {  }
+  });
+})();
+
+function slurp(ptr) {
+  const m = new Uint8Array(instance.exports.memory.buffer);
+  let end = ptr;
+  while (m[end] !== 0) end++;
+  return dec.decode(m.subarray(ptr, end));
+}
+
+function runPie(source) {
+  const exp = instance.exports;
+  const src = enc.encode(source);
+  const OUT = 65536, ERR = 16384;
+  const pSrc = exp.malloc(src.length + 1);
+  const pOut = exp.malloc(OUT);
+  const pErr = exp.malloc(ERR);
+  try {
+    const m = new Uint8Array(exp.memory.buffer);
+    m.set(src, pSrc);
+    m[pSrc + src.length] = 0;
+    const rc = exp.pie_web_eval(pSrc, pOut, OUT, pErr, ERR, 0n);
+    return { rc, out: slurp(pOut), err: slurp(pErr) };
+  } finally {
+    exp.free(pSrc);
+    exp.free(pOut);
+    exp.free(pErr);
+  }
+}
+
+async function boot() {
+  const res = await fetch("pie_interp.wasm");
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const bytes = await res.arrayBuffer();
+  const { instance: inst } = await WebAssembly.instantiate(bytes, {
+    wasi_snapshot_preview1: makeWasiShim(),
+  });
+  instance = inst;
+  instance.exports._initialize();
+  return inst;
+
+  function makeWasiShim() {
+    let viewCache = null;
+    const view = () => {
+      const b = instance.exports.memory.buffer;
+      if (!viewCache || viewCache.buffer !== b) {
+        viewCache = new DataView(b);
+      }
+      return viewCache;
+    };
+    return {
+      environ_get: () => 0,
+      environ_sizes_get: (argcPtr, bufSizePtr) => {
+        view().setUint32(argcPtr, 0, true);
+        view().setUint32(bufSizePtr, 0, true);
+        return 0;
+      },
+      clock_time_get: (id, prec, outPtr) => {
+        view().setBigUint64(outPtr, BigInt(Date.now()) * 1000000n, true);
+        return 0;
+      },
+      fd_write: (fd, iovsPtr, iovsLen, nwrittenPtr) => {
+        const v = view();
+        let n = 0;
+        for (let i = 0; i < iovsLen; i++) {
+          n += v.getUint32(iovsPtr + i * 8 + 4, true);
+        }
+        v.setUint32(nwrittenPtr, n, true);
+        return 0;
+      },
+      fd_read: (fd, iovsPtr, iovsLen, nreadPtr) => {
+        view().setUint32(nreadPtr, 0, true);
+        return 0;
+      },
+      fd_close: () => 0,
+      fd_seek: (fd, offLo, offHi, whence, outPtr) => {
+        view().setBigUint64(outPtr, 0n, true);
+        return 0;
+      },
+      fd_prestat_get: () => 8,
+      fd_prestat_dir_name: () => 0,
+      poll_oneoff: (inPtr, outPtr, nsubs, neventsPtr) => {
+        view().setUint32(neventsPtr, 0, true);
+        return 0;
+      },
+      proc_exit: (code) => { throw new Error("proc_exit " + code); },
+    };
+  }
+}
+
+$("run").addEventListener("click", () => {
+  hidePopup();
+  $("run").disabled = true;
+  try {
+    const t0 = performance.now();
+    const { rc, out, err } = runPie($("src").value);
+    const ms = (performance.now() - t0).toFixed(1);
+    $("stdout").textContent = out;
+    $("stderr").textContent = err;
+    $("msg").textContent =
+      "exit " + rc + " · " + ms + " ms" + (err ? " · see error below" : "");
+  } finally {
+    $("run").disabled = false;
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    e.preventDefault();
+    $("run").click();
+  }
+});
+
+let autoRun = false;
+let autoTimer = 0;
+try {
+  autoRun = !!(window.localStorage &&
+    window.localStorage.getItem("pie-auto") === "1");
+} catch (e) { autoRun = false; }
+
+function renderAuto() {
+  const btn = $("auto");
+  btn.textContent = autoRun ? "auto: on" : "auto: off";
+  btn.setAttribute("aria-pressed", autoRun ? "true" : "false");
+}
+
+function scheduleAuto() {
+  if (!autoRun) return;
+  if (autoTimer) clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => {
+    autoTimer = 0;
+    if (!$("run").disabled) $("run").click();
+  }, 600);
+}
+
+$("auto").addEventListener("click", () => {
+  autoRun = !autoRun;
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem("pie-auto", autoRun ? "1" : "0");
+    }
+  } catch (e) {  }
+  renderAuto();
+  if (autoRun && !$("run").disabled) $("run").click();
+});
+renderAuto();
+
+(async () => {
+  const shared = await loadSharedCode();
+  if (!shared) {
+    ta.value = EXAMPLES.hello;
+  } else {
+    tabBtns.forEach((b) => b.classList.remove("active"));
+    $("filename").textContent = "shared";
+  }
+  autosize();
+  renderHighlight();
+  updateStatus();
+  scheduleShare();
+})();
+boot().then(
+  () => {
+    $("run").disabled = false;
+    $("run").textContent = "run ▸";
+    $("msg").textContent = "ready · Ctrl+Enter to run";
+  },
+  (e) => {
+    $("msg").textContent =
+      " (" + e.message + ") — ";
+  }
+);
+</script>
+</body>
+</html>
