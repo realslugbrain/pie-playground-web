@@ -295,6 +295,56 @@ textarea::selection {
 
 #complete li.active .kind { color: #121212; }
 
+details.docs {
+    border: 1px solid var(--border);
+    background-color: var(--code-bg);
+    margin: 16px 0;
+    padding: 0.5rem 0.75rem;
+}
+
+details.docs summary {
+    cursor: pointer;
+    font-weight: bold;
+    padding: 0.25rem 0;
+}
+
+details.docs pre {
+    overflow-x: auto;
+    padding: 0.5rem 0.75rem;
+    border-left: 2px solid var(--border);
+}
+
+details.docs pre i {
+    color: var(--text-muted);
+}
+
+#stdlib-docs details {
+    margin: 0.25rem 0;
+    padding: 0;
+    border: none;
+    background: none;
+}
+
+#stdlib-docs summary {
+    font-weight: normal;
+    font-family: monospace;
+}
+
+#stdlib-docs ul {
+    list-style: none;
+    margin: 0.25rem 0 0.75rem 0;
+    padding-left: 1rem;
+}
+
+#stdlib-docs li {
+    padding: 0.15rem 0;
+    font-size: 0.85rem;
+}
+
+#stdlib-docs code {
+    font-family: monospace;
+}
+
 button.btn-primary {
     font: inherit;
     font-size: 0.9rem;

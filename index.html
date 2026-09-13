@@ -48,6 +48,555 @@
   <pre id="stderr"></pre>
 </div>
 <p class="hint"><kbd>Tab</kbd> indent · <kbd>↑↓</kbd> + <kbd>Enter</kbd> complete · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> run</p>
+<details class="docs" open>
+<summary>syntax quick reference</summary>
+<pre>fn main() -> int:
+    x: int -> 5          <i>typed binding</i>
+    y -> 10              <i>inferred binding</i>
+    x <- x + 1           <i>assignment is &lt;-</i>
+    println(x)           <i>with newline (print has none)</i>
+    return 0
+end</pre>
+<pre>if x > 0:
+    println("pos")
+else:
+    println("neg")
+end
+while x &gt; 0:
+    x <- x - 1
+end
+for i in 0..10:
+    println(i)
+end</pre>
+<pre>match code:
+    200 => println("ok")
+    _   => println("other")
+end</pre>
+<pre>fn add(a: int, b: int) -> int:
+    return a + b
+end
+fn greet(name: string) -> void ![IO]:
+    println(name)
+end</pre>
+<pre>name: string -> "Olivia"
+msg: string -> "Hello, $(name)! Seven plus five is $(7 + 5)"</pre>
+<pre>pair: (int, int) -> (3, 4)
+(x, y) -> pair           <i>destructuring declaration</i></pre>
+<pre>l: List[int] -> List[int]()
+l.push(1)
+println(l.get(0))
+m: HashMap[string, int] -> HashMap[string, int]()
+m.insert("a", 1)</pre>
+<pre>struct Point:
+    x: int
+    y: int
+end
+p: Point -> Point{ x -> 3, y -> 4 }
+println(p.x)</pre>
+<pre>enum Color:
+    Red
+    Green
+end
+c: Color -> Color::Red</pre>
+<pre>defer println("last")   <i>runs at scope exit, LIFO</i></pre>
+<pre>import pie::std::fs::*   <i>core (println, print_int, ...) auto-imports</i></pre>
+</details>
+<details class="docs">
+<summary>standard library reference</summary>
+<div id="stdlib-docs">
+<details>
+<summary>pie::alloc::deque</summary>
+<p>Double-ended queue (deque) with O(1) push/pop at both ends.</p>
+<ul>
+<li><code>pub unsafe fn null_ptr() -&gt; ptr</code> (<code>@intrinsic(&quot;pie.null_ptr&quot;)</code>)</li>
+<li><code>pub unsafe fn set_ptr_offset(p: ptr, offset: int, value: int) -&gt; void</code> (<code>@intrinsic(&quot;pie.ptr_set_offset&quot;)</code>)</li>
+<li><code>pub unsafe fn get_ptr_offset(p: ptr, offset: int) -&gt; int</code> (<code>@intrinsic(&quot;pie.ptr_get_offset&quot;)</code>)</li>
+<li><code>pub struct Deque[T]</code> - A circular-buffer deque allocated in the active region.</li>
+<li><code>pub fn new() -&gt; Deque[T]</code> - Creates an empty deque.</li>
+<li><code>pub fn push_back(self, item: T) -&gt; void</code> - Appends an item to the back of the deque.</li>
+<li><code>pub fn push_front(self, item: T) -&gt; void</code> - Prepends an item to the front of the deque.</li>
+<li><code>pub fn pop_front(self) -&gt; Option[T]</code> - Removes and returns the front item, or None if empty.</li>
+<li><code>pub fn pop_back(self) -&gt; Option[T]</code> - Removes and returns the back item, or None if empty.</li>
+<li><code>pub fn grow(self) -&gt; void</code> - Doubles the capacity, relocating elements into a fresh buffer.</li>
+<li><code>pub fn len(self) -&gt; int</code> - Returns the number of elements in the deque.</li>
+<li><code>pub fn length(self) -&gt; int</code> - Returns the number of elements in the deque (alias for len).</li>
+<li><code>pub fn is_empty(self) -&gt; bool</code> - Returns true if the deque contains no elements.</li>
+<li><code>pub fn clear(self) -&gt; void</code> - Clears the deque, setting count to 0 without freeing memory.</li>
+</ul>
+</details>
+<details>
+<summary>pie::alloc::fmt</summary>
+<p>Formatting utilities: hex/bin conversion and the Formattable trait.</p>
+<ul>
+<li><code>pub trait Formattable</code> - Trait for types that can format themselves into a StringBuilder.</li>
+<li><code>pub fn to_hex_str(val: int) -&gt; string</code> - Converts an integer to its hexadecimal string representation (e.g. 255 -&gt; &quot;ff&quot;).</li>
+<li><code>pub fn to_bin_str(val: int) -&gt; string</code> - Converts an integer to its binary string representation (e.g. 5 -&gt; &quot;101&quot;).</li>
+</ul>
+</details>
+<details>
+<summary>pie::alloc::hashmap</summary>
+<p>Hash map implementation backed by parallel key/value lists.</p>
+<ul>
+</ul>
+</details>
+<details>
+<summary>pie::alloc::list</summary>
+<p>Region-backed dynamic array with exponential growth and O(1) amortized push.</p>
+<ul>
+<li><code>pub unsafe fn null_ptr() -&gt; ptr</code> (<code>@intrinsic(&quot;pie.null_ptr&quot;)</code>)</li>
+<li><code>pub unsafe fn set_ptr_offset(p: ptr, offset: int, value: int) -&gt; void</code> (<code>@intrinsic(&quot;pie.ptr_set_offset&quot;)</code>)</li>
+<li><code>pub unsafe fn get_ptr_offset(p: ptr, offset: int) -&gt; int</code> (<code>@intrinsic(&quot;pie.ptr_get_offset&quot;)</code>)</li>
+<li><code>pub struct List[T]</code> - A growable array allocated in the active RBMM region.</li>
+<li><code>pub fn new() -&gt; List[T]</code> - Creates an empty list.</li>
+<li><code>pub fn push(self, item: T) -&gt; void</code> - Appends an item to the end of the list, growing if needed.</li>
+<li><code>pub fn get(self, index: int) -&gt; Option[T]</code> - Returns the element at index, or None if out of bounds.</li>
+<li><code>pub fn pop(self) -&gt; Option[T]</code> - Removes and returns the last element, or None if empty.</li>
+<li><code>pub fn len(self) -&gt; int</code> - Returns the number of elements in the list.</li>
+<li><code>pub fn length(self) -&gt; int</code> - Returns the number of elements in the list (alias for len).</li>
+<li><code>pub fn is_empty(self) -&gt; bool</code> - Returns true if the list contains no elements.</li>
+<li><code>pub fn clear(self) -&gt; void</code> - Clears the list, setting length to 0 without freeing memory.</li>
+</ul>
+</details>
+<details>
+<summary>pie::alloc::set</summary>
+<p>Hash set implementation backed by a HashMap to integer markers.</p>
+<ul>
+</ul>
+</details>
+<details>
+<summary>pie::alloc::string_builder</summary>
+<p>Efficient string builder with region-backed buffer management.</p>
+<ul>
+</ul>
+</details>
+<details>
+<summary>pie::core::debug</summary>
+<p>Stack trace capture &amp; debugging - zero-allocation, sub-microsecond.</p>
+<ul>
+<li><code>pub unsafe fn null_ptr() -&gt; ptr</code> (<code>@intrinsic(&quot;pie.null_ptr&quot;)</code>) - Raw pointer access intrinsics (needed for C struct unpacking).</li>
+<li><code>pub unsafe fn get_ptr_offset(p: ptr, offset: int) -&gt; int</code> (<code>@intrinsic(&quot;pie.ptr_get_offset&quot;)</code>)</li>
+<li><code>pub fn ptr_to_string(p: ptr) -&gt; string</code> (<code>@intrinsic(&quot;pie.ptr_to_string&quot;)</code>) - Copy a C NUL-terminated string into region memory.</li>
+<li><code>pub fn debug_capture_stack_raw() -&gt; ptr ![IO]</code> (<code>@intrinsic(&quot;pie.debug_capture_stack&quot;)</code>) - Capture the current call stack (returns opaque C handle).</li>
+<li><code>pub fn debug_print_stack_raw(trace: ptr) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.debug_print_stack&quot;)</code>) - Print a captured stack trace to stderr.</li>
+<li><code>pub struct StackFrame</code> - A single resolved stack frame.</li>
+<li><code>pub struct StackTrace</code> - A captured stack trace containing multiple frames.</li>
+<li><code>pub fn capture_stack() -&gt; StackTrace ![IO]</code> - Capture the current call stack trace. Returns a StackTrace with resolved function names and source locations. C struct layout: PieDebugFrame { ip:8, fn_name:256, file_path:256, line:4, col:4, is_pure:1, is_io:1, pad:6 } Total frame size = 536 bytes. frame_count at offset 34304.</li>
+<li><code>pub fn print_stack(trace_ptr: ptr) -&gt; void ![IO]</code> - Print a stack trace to stderr with ANSI color formatting.</li>
+<li><code>pub fn dump_stack() -&gt; void ![IO]</code> - Capture and immediately print the current stack trace to stderr.</li>
+</ul>
+</details>
+<details>
+<summary>pie::core::io</summary>
+<p>Core I/O operations: printing and user input.</p>
+<ul>
+<li><code>pub fn print_str(s: string) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.print_str&quot;)</code>) - Prints a string to stdout.</li>
+<li><code>pub fn input(prompt: string) -&gt; string ![IO]</code> (<code>@intrinsic(&quot;pie.input&quot;)</code>) - Reads a line of input from stdin, using prompt as the prompt string.</li>
+<li><code>pub fn print_int(val: int) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.print_int&quot;)</code>) - Prints an integer to stdout.</li>
+<li><code>pub fn println(val: int) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.println&quot;)</code>) - Prints an integer followed by a newline to stdout.</li>
+<li><code>pub fn print(val: int) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.print&quot;)</code>) - Prints an integer to stdout (no newline).</li>
+</ul>
+</details>
+<details>
+<summary>pie::core::math</summary>
+<p>Mathematical functions: floating-point, trigonometric, logarithmic, and bit operations.</p>
+<ul>
+<li><code>pub fn sqrt(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.sqrt.f64&quot;)</code>) - Returns the square root of x.</li>
+<li><code>pub fn pow(base: float&lt;64&gt;, exp: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.pow.f64&quot;)</code>) - Returns base raised to the power exp.</li>
+<li><code>pub fn abs(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.fabs.f64&quot;)</code>) - Returns the absolute value of a float.</li>
+<li><code>pub fn ceil(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.ceil.f64&quot;)</code>) - Rounds x up to the nearest integer.</li>
+<li><code>pub fn floor(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.floor.f64&quot;)</code>) - Rounds x down to the nearest integer.</li>
+<li><code>pub fn fma(a: float&lt;64&gt;, b: float&lt;64&gt;, c: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.fma.f64&quot;)</code>) - Returns a*b + c (fused multiply-add).</li>
+<li><code>pub fn popcount(x: int) -&gt; int</code> (<code>@intrinsic(&quot;llvm.ctpop.i64&quot;)</code>) - Returns the number of set bits (population count).</li>
+<li><code>pub fn clz(x: int) -&gt; int</code> (<code>@intrinsic(&quot;llvm.ctlz.i64&quot;)</code>) - Returns the number of leading zeros.</li>
+<li><code>pub fn cttz(x: int) -&gt; int</code> (<code>@intrinsic(&quot;llvm.cttz.i64&quot;)</code>) - Returns the number of trailing zeros.</li>
+<li><code>pub fn sin(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.sin.f64&quot;)</code>) - Returns the sine of x (radians).</li>
+<li><code>pub fn cos(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.cos.f64&quot;)</code>) - Returns the cosine of x (radians).</li>
+<li><code>pub fn tan(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;pie.math_tan_f64&quot;)</code>) - Returns the tangent of x (radians).</li>
+<li><code>pub fn atan2(y: float&lt;64&gt;, x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;pie.math_atan2_f64&quot;)</code>) - Returns the arctangent of y/x, using the signs to determine quadrant.</li>
+<li><code>pub fn asin(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;pie.math_asin_f64&quot;)</code>) - Returns the arcsine of x.</li>
+<li><code>pub fn acos(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;pie.math_acos_f64&quot;)</code>) - Returns the arccosine of x.</li>
+<li><code>pub fn atan(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;pie.math_atan_f64&quot;)</code>) - Returns the arctangent of x.</li>
+<li><code>pub fn log(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.log.f64&quot;)</code>) - Returns the natural logarithm of x.</li>
+<li><code>pub fn exp(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.exp.f64&quot;)</code>) - Returns e raised to the power x.</li>
+<li><code>pub fn log10(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.log10.f64&quot;)</code>) - Returns the base-10 logarithm of x.</li>
+<li><code>pub fn log2(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.log2.f64&quot;)</code>) - Returns the base-2 logarithm of x.</li>
+<li><code>pub fn round(x: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.round.f64&quot;)</code>) - Returns x rounded to the nearest integer.</li>
+<li><code>pub fn fmin(a: float&lt;64&gt;, b: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.minnum.f64&quot;)</code>) - Returns the smaller of a and b (NaN-tolerant).</li>
+<li><code>pub fn fmax(a: float&lt;64&gt;, b: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> (<code>@intrinsic(&quot;llvm.maxnum.f64&quot;)</code>) - Returns the larger of a and b (NaN-tolerant).</li>
+<li><code>pub fn fclamp(val: float&lt;64&gt;, low: float&lt;64&gt;, high: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> - Clamps val to the range [low, high].</li>
+<li><code>pub fn bit_lshr(x: int, n: int) -&gt; int</code> (<code>@intrinsic(&quot;pie.bit_lshr_i64&quot;)</code>) - Logical (unsigned) right shift with zero-fill.</li>
+</ul>
+</details>
+<details>
+<summary>pie::core::memory</summary>
+<p>Low-level memory allocation: region-based alloc, realloc, promote, and pool.</p>
+<ul>
+<li><code>pub fn alloc(size: int, align: int) -&gt; ptr</code> (<code>@intrinsic(&quot;pie.region_alloc&quot;)</code>) - Allocates `size` bytes with the given alignment in the current region.</li>
+<li><code>pub fn realloc(p: ptr, old_sz: int, new_sz: int, align: int) -&gt; ptr</code> (<code>@intrinsic(&quot;pie.region_realloc&quot;)</code>) - Reallocates a region pointer from old_sz to new_sz bytes.</li>
+<li><code>pub fn promote(p: ptr, sz: int) -&gt; ptr</code> (<code>@intrinsic(&quot;pie.region_promote&quot;)</code>) - Promotes a region pointer to the parent scope, keeping it alive beyond the current region.</li>
+<li><code>pub fn leave() -&gt; void</code> (<code>@intrinsic(&quot;pie.region_leave&quot;)</code>) - Leaves the current region scope, releasing all non-promoted allocations.</li>
+<li><code>pub fn pool_alloc(elem_size: int, align: int) -&gt; ptr</code> (<code>@intrinsic(&quot;pie.pool_alloc&quot;)</code>) - Allocates an element from the object pool with the given size and alignment.</li>
+<li><code>pub fn pool_free(p: ptr) -&gt; void</code> (<code>@intrinsic(&quot;pie.pool_free&quot;)</code>) - Returns an element to the object pool.</li>
+<li><code>pub unsafe fn ptr_from_int(address: int) -&gt; ptr</code> (<code>@intrinsic(&quot;pie.ptr_from_int&quot;)</code>) - Converts a raw integer address to a pointer (unsafe: bypasses region system).</li>
+<li><code>pub unsafe fn transmute_bits(val: int) -&gt; int</code> (<code>@intrinsic(&quot;pie.transmute_bits&quot;)</code>) - Reinterprets the bit pattern of an integer value (unsafe: type punning).</li>
+<li><code>pub unsafe fn malloc_raw(size: int, align: int) -&gt; ptr</code> (<code>@intrinsic(&quot;pie.malloc_raw&quot;)</code>) - Raw malloc bypassing the Pie region system (unsafe: manual free required).</li>
+<li><code>pub unsafe fn free_raw(p: ptr) -&gt; void</code> (<code>@intrinsic(&quot;pie.free_raw&quot;)</code>) - Raw free bypassing the Pie region system (unsafe: only for pie_malloc_raw results).</li>
+</ul>
+</details>
+<details>
+<summary>pie::core::option</summary>
+<p>Optional value type: represents a value that may or may not be present.</p>
+<ul>
+<li><code>pub enum Option[T]</code> - An optional value: Some(value) when present, None when absent.</li>
+<li><code>pub fn is_some(self) -&gt; bool</code> - Returns true if this is a Some variant.</li>
+<li><code>pub fn is_none(self) -&gt; bool</code> - Returns true if this is a None variant.</li>
+<li><code>pub fn unwrap_or(self, default_val: T) -&gt; T</code> - Returns the inner value if Some, otherwise returns default_val.</li>
+</ul>
+</details>
+<details>
+<summary>pie::core::primitive</summary>
+<p>Core primitive operations: integer arithmetic, intrinsics, and utilities.</p>
+<ul>
+<li><code>pub fn null_str() -&gt; string</code> (<code>@intrinsic(&quot;pie.null_ptr&quot;)</code>) - Returns the NULL string - a zero-length string with null pointer.</li>
+<li><code>pub fn size_of[T]() -&gt; int ![Pure]</code> (<code>@intrinsic(&quot;pie.type_size&quot;)</code>) - Returns the ABI byte size of type T at compile time.</li>
+<li><code>pub fn align_of[T]() -&gt; int ![Pure]</code> (<code>@intrinsic(&quot;pie.type_align&quot;)</code>) - Returns the ABI alignment of type T at compile time.</li>
+<li><code>pub fn min(a: int, b: int) -&gt; int ![Pure]</code> - Returns the smaller of two integers.</li>
+<li><code>pub fn max(a: int, b: int) -&gt; int ![Pure]</code> - Returns the larger of two integers.</li>
+<li><code>pub fn clamp(val: int, low: int, high: int) -&gt; int ![Pure]</code> - Clamps val to the range [low, high].</li>
+<li><code>pub fn abs_int(x: int) -&gt; int ![Pure]</code> - Returns the absolute value of an integer.</li>
+<li><code>pub fn is_even(x: int) -&gt; bool ![Pure]</code> - Returns true if x is even.</li>
+<li><code>pub fn is_odd(x: int) -&gt; bool ![Pure]</code> - Returns true if x is odd.</li>
+</ul>
+</details>
+<details>
+<summary>pie::core::range</summary>
+<p>Half-open range type: represents [start, end) intervals.</p>
+<ul>
+<li><code>pub struct Range[T]</code> - A half-open range [start, end). Used for iteration and slicing.</li>
+<li><code>pub fn contains(self, val: int) -&gt; bool ![Pure]</code> - Returns true if val is within [start, end).</li>
+<li><code>pub fn len(self) -&gt; int ![Pure]</code> - Returns the number of integers in the range.</li>
+<li><code>pub fn is_empty(self) -&gt; bool ![Pure]</code> - Returns true if the range is empty.</li>
+</ul>
+</details>
+<details>
+<summary>pie::core::reflect</summary>
+<ul>
+<li><code>pub fn type_name_of[T]() -&gt; string</code> (<code>@intrinsic(&quot;pie.reflect_type_name&quot;)</code>)</li>
+<li><code>pub fn field_count_of[T]() -&gt; int</code> (<code>@intrinsic(&quot;pie.reflect_field_count&quot;)</code>)</li>
+<li><code>pub fn field_name_at[T](idx: int) -&gt; string</code> (<code>@intrinsic(&quot;pie.reflect_field_name_at&quot;)</code>)</li>
+<li><code>pub fn field_type_at[T](idx: int) -&gt; string</code> (<code>@intrinsic(&quot;pie.reflect_field_type_at&quot;)</code>)</li>
+<li><code>pub fn reflect_size_of[T]() -&gt; int</code> (<code>@intrinsic(&quot;pie.reflect_size_of&quot;)</code>)</li>
+<li><code>pub fn reflect_align_of[T]() -&gt; int</code> (<code>@intrinsic(&quot;pie.reflect_align_of&quot;)</code>)</li>
+<li><code>pub fn debug_dump[T]() -&gt; int</code> (<code>@intrinsic(&quot;pie.reflect_debug_dump&quot;)</code>)</li>
+<li><code>pub fn for_each_field[T](callback: fn(string, int) -&gt; int) -&gt; int</code> (<code>@intrinsic(&quot;pie.reflect_for_each_field&quot;)</code>)</li>
+</ul>
+</details>
+<details>
+<summary>pie::core::result</summary>
+<p>Result type for error handling: Ok(value) on success, Err(error) on failure.</p>
+<ul>
+<li><code>pub fn to_int(s: string) -&gt; Result[int, int]</code> (<code>@intrinsic(&quot;pie.to_int&quot;)</code>) - Parses a string to an integer, returning Ok(value) or Err(error_code).</li>
+<li><code>pub enum Result[T, E]</code> - A result of an operation that may succeed or fail.</li>
+<li><code>pub fn is_ok(self) -&gt; bool</code> - Returns true if this is an Ok variant.</li>
+<li><code>pub fn is_err(self) -&gt; bool</code> - Returns true if this is an Err variant.</li>
+<li><code>pub fn unwrap_or(self, default_val: T) -&gt; T</code> - Returns the inner value if Ok, otherwise returns default_val.</li>
+</ul>
+</details>
+<details>
+<summary>pie::core::slice</summary>
+<p>Slice operations: length checks, safe indexing, and sub-slicing.</p>
+<ul>
+<li><code>pub fn len(self) -&gt; int ![Pure]</code> - Returns the number of elements in the slice.</li>
+<li><code>pub fn is_empty(self) -&gt; bool ![Pure]</code> - Returns true if the slice contains no elements.</li>
+<li><code>pub fn get(self, index: int) -&gt; Option[T] ![Pure]</code> - Returns the element at index, or None if out of bounds.</li>
+<li><code>pub fn subslice(self, start: int, stop: int) -&gt; Slice[T] ![Pure]</code> - Returns a sub-slice from start to stop (exclusive). Returns empty slice if out of bounds.</li>
+</ul>
+</details>
+<details>
+<summary>pie::core::test</summary>
+<p>Built-in testing and assertion suite.</p>
+<ul>
+<li><code>pub fn assert_true(cond: bool) -&gt; void ![IO]</code> - Asserts that cond is true; aborts with an error message on failure.</li>
+<li><code>pub fn assert_eq(actual: int, expected: int) -&gt; void ![IO]</code> - Asserts that actual equals expected; aborts with details on mismatch.</li>
+<li><code>pub fn assert_ne(actual: int, expected: int) -&gt; void ![IO]</code> - Asserts that actual is not equal to expected; aborts with details on mismatch.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::async</summary>
+<p>Async task spawning, futures, and non-blocking I/O reactor.</p>
+<ul>
+<li><code>pub struct Future[T]</code> - A future that holds a computed result once ready.</li>
+<li><code>pub fn is_ready(self) -&gt; bool ![Pure]</code> - Returns true if the future has completed.</li>
+<li><code>pub fn async_scope_enter_c() -&gt; ptr ![IO]</code> (<code>@intrinsic(&quot;pie.async_scope_enter&quot;)</code>)</li>
+<li><code>pub fn async_scope_spawn_c(scope_ptr: ptr, task_fn: ptr) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.async_scope_spawn&quot;)</code>)</li>
+<li><code>pub fn async_scope_wait_c(scope_ptr: ptr) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.async_scope_wait&quot;)</code>)</li>
+<li><code>pub struct Scope</code> - A structured concurrency scope that manages spawned tasks.</li>
+<li><code>pub fn wait_all(self) -&gt; void ![IO]</code> - Blocks until all tasks in this scope have completed.</li>
+<li><code>pub fn spawn(s: Scope, task_fn: ptr) -&gt; Future[int] ![IO]</code> - Spawns a task in the given scope, returning a ready Future.</li>
+<li><code>pub fn scope(scope_fn: ptr) -&gt; void ![IO]</code> - Creates a scope, runs scope_fn, then waits for all spawned tasks.</li>
+<li><code>pub fn async_reactor_init_c() -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.async_reactor_init&quot;)</code>)</li>
+<li><code>pub fn async_reactor_register_c(epfd: int, fd: int, events: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.async_reactor_register&quot;)</code>)</li>
+<li><code>pub fn async_reactor_poll_c(epfd: int, timeout_ms: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.async_reactor_poll&quot;)</code>)</li>
+<li><code>pub struct Reactor</code> - An I/O event reactor wrapping epoll/kqueue.</li>
+<li><code>pub fn create() -&gt; Result[Reactor, int] ![IO]</code> - Creates a new reactor. Returns Err(errno) on failure.</li>
+<li><code>pub fn register(self, fd: int, events: int) -&gt; Result[int, int] ![IO]</code> - Registers a file descriptor with the given event mask. Returns Err(errno) on failure.</li>
+<li><code>pub fn poll(self, timeout_ms: int) -&gt; int ![IO]</code> - Polls for events, blocking up to timeout_ms milliseconds. Returns number of ready events.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::env</summary>
+<p>Process environment: command-line arguments and environment variables.</p>
+<ul>
+<li><code>pub fn env_argc() -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.env_argc&quot;)</code>)</li>
+<li><code>pub fn env_argv(index: int) -&gt; string ![IO]</code> (<code>@intrinsic(&quot;pie.env_argv&quot;)</code>)</li>
+<li><code>pub fn env_get_var_c(key: string) -&gt; Option[string] ![IO]</code> (<code>@intrinsic(&quot;pie.env_get_var&quot;)</code>)</li>
+<li><code>pub fn env_set_var_c(key: string, value: string) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.env_set_var&quot;)</code>)</li>
+<li><code>pub fn env_remove_var_c(key: string) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.env_remove_var&quot;)</code>)</li>
+<li><code>pub fn env_has_var_c(key: string) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.env_has_var&quot;)</code>)</li>
+<li><code>pub fn env_current_dir_c() -&gt; string ![IO]</code> (<code>@intrinsic(&quot;pie.env_current_dir&quot;)</code>)</li>
+<li><code>pub fn args() -&gt; List[string] ![IO]</code> - Returns the command-line arguments (including argv[0]).</li>
+<li><code>pub fn var(key: string) -&gt; Option[string] ![IO]</code> - Reads an environment variable by key. Returns None if not set.</li>
+<li><code>pub fn set_var(key: string, value: string) -&gt; Result[void, int] ![IO]</code> - Creates or overwrites an environment variable. Returns Err(errno) on failure.</li>
+<li><code>pub fn remove_var(key: string) -&gt; Result[void, int] ![IO]</code> - Deletes an environment variable. Returns Err(errno) on failure.</li>
+<li><code>pub fn contains_var(key: string) -&gt; int ![IO]</code> - Returns 1 if the environment variable is set, 0 otherwise.</li>
+<li><code>pub fn current_dir() -&gt; Result[string, int] ![IO]</code> - Returns the current working directory, or Err(-1) if undeterminable.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::fs</summary>
+<ul>
+<li><code>pub fn exists(path: string) -&gt; bool ![IO]</code></li>
+<li><code>pub fn read_string(path: string) -&gt; Result[string, int] ![IO]</code></li>
+<li><code>pub fn write_string(path: string, content: string) -&gt; Result[void, int] ![IO]</code></li>
+<li><code>pub fn remove_file(path: string) -&gt; Result[void, int] ![IO]</code></li>
+<li><code>pub fn create_dir(path: string) -&gt; Result[void, int] ![IO]</code></li>
+<li><code>pub fn remove_dir(path: string) -&gt; Result[void, int] ![IO]</code></li>
+<li><code>pub fn read_dir(path: string) -&gt; Result[List[string], int] ![IO]</code></li>
+</ul>
+</details>
+<details>
+<summary>pie::std::http</summary>
+<ul>
+<li><code>pub fn response_ok(body: string) -&gt; Response ![Pure]</code></li>
+<li><code>pub fn response_ok_with_headers(body: string, headers: string) -&gt; Response ![Pure]</code></li>
+<li><code>pub fn response_not_found() -&gt; Response ![Pure]</code></li>
+<li><code>pub fn response_error(status: int, body: string) -&gt; Response ![Pure]</code></li>
+<li><code>pub fn get(url: string) -&gt; Result[HttpResponse, string] ![IO]</code></li>
+<li><code>pub fn post(url: string, body: string) -&gt; Result[HttpResponse, string] ![IO]</code></li>
+<li><code>pub fn get_with_headers(url: string, headers: string) -&gt; Result[HttpResponse, string] ![IO]</code></li>
+<li><code>pub fn post_with_headers(url: string, body: string, headers: string) -&gt; Result[HttpResponse, string] ![IO]</code></li>
+<li><code>pub fn client_builder() -&gt; HttpClient ![Pure]</code></li>
+<li><code>pub fn client_with_connections(client: HttpClient, max_conn: int) -&gt; HttpClient ![Pure]</code></li>
+<li><code>pub fn client_with_timeout(client: HttpClient, timeout: int) -&gt; HttpClient ![Pure]</code></li>
+<li><code>pub fn server_bind(bind_addr: string, port: int) -&gt; HttpServer ![Pure]</code></li>
+<li><code>pub fn server_with_threads(server: HttpServer, num_threads: int) -&gt; HttpServer ![Pure]</code></li>
+<li><code>pub fn server_with_file(server: HttpServer, file_path: string) -&gt; HttpServer ![IO]</code></li>
+<li><code>pub fn server_with_static_dir(server: HttpServer, dir_path: string) -&gt; HttpServer ![IO]</code></li>
+<li><code>pub fn server_with_tls(server: HttpServer, cert_path: string, key_path: string) -&gt; HttpServer ![IO]</code></li>
+<li><code>pub fn server_with_http2(server: HttpServer) -&gt; HttpServer ![IO]</code></li>
+<li><code>pub fn h2_default_settings() -&gt; int ![Pure]</code> (<code>@intrinsic(&quot;pie.h2_default_settings&quot;)</code>)</li>
+<li><code>pub fn h2_connection_create(fd: int, ssl: int, server: int) -&gt; int ![Pure]</code> (<code>@intrinsic(&quot;pie.h2_connection_create&quot;)</code>)</li>
+<li><code>pub fn h2_connection_feed(conn: int, data: int, len: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.h2_connection_feed&quot;)</code>)</li>
+<li><code>pub fn h2_connection_flush(conn: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.h2_connection_flush&quot;)</code>)</li>
+<li><code>pub fn h2_connection_alive(conn: int) -&gt; int ![Pure]</code> (<code>@intrinsic(&quot;pie.h2_connection_alive&quot;)</code>)</li>
+<li><code>pub fn h2_connection_destroy(conn: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.h2_connection_destroy&quot;)</code>)</li>
+<li><code>pub fn h2_send_response(conn: int, stream_id: int, status: int, body: int, body_len: int, headers: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.h2_send_response&quot;)</code>)</li>
+<li><code>pub fn h2_server_push(conn: int, stream_id: int, path: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.h2_server_push&quot;)</code>)</li>
+<li><code>pub fn h3_is_available() -&gt; int ![Pure]</code> (<code>@intrinsic(&quot;pie.h3_is_available&quot;)</code>)</li>
+<li><code>pub fn h3_server_create(addr: int, port: int, cert: int, key: int, server: int) -&gt; int ![Pure]</code> (<code>@intrinsic(&quot;pie.h3_server_create&quot;)</code>)</li>
+<li><code>pub fn h3_server_run(server: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.h3_server_run&quot;)</code>)</li>
+<li><code>pub fn h3_server_stop(server: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.h3_server_stop&quot;)</code>)</li>
+<li><code>pub fn h3_server_destroy(server: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.h3_server_destroy&quot;)</code>)</li>
+<li><code>pub fn h3_send_response(server: int, stream_id: int, status: int, body: int, body_len: int, headers: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.h3_send_response&quot;)</code>)</li>
+<li><code>pub fn h3_connection_alive(server: int) -&gt; int ![Pure]</code> (<code>@intrinsic(&quot;pie.h3_connection_alive&quot;)</code>)</li>
+<li><code>pub fn h3_connection_destroy(server: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.h3_connection_destroy&quot;)</code>)</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::io</summary>
+<p>File and stream I/O abstractions with standard stream handles.</p>
+<ul>
+<li><code>pub fn open(p: Path) -&gt; Result[File, int] ![IO]</code> - Opens an existing file for reading. Returns Err(errno) on failure.</li>
+<li><code>pub fn create(p: Path) -&gt; Result[File, int] ![IO]</code> - Creates a new file (truncate) for writing. Returns Err(errno) on failure.</li>
+<li><code>pub fn write_string(self, s: string) -&gt; Result[int, int] ![IO]</code> - Writes a string to the file. Returns Ok(bytes_written) or Err(errno).</li>
+<li><code>pub fn read_to_string(self) -&gt; Result[string, int] ![IO]</code> - Reads the entire file content into a string. Returns Err(errno) on failure.</li>
+<li><code>pub fn close(self) -&gt; void ![IO]</code> - Closes the file handle.</li>
+<li><code>pub fn stdin() -&gt; ptr ![IO]</code> (<code>@intrinsic(&quot;pie.io_stdin&quot;)</code>) - Returns a handle to stdin (fd 0).</li>
+<li><code>pub fn stdout() -&gt; ptr ![IO]</code> (<code>@intrinsic(&quot;pie.io_stdout&quot;)</code>) - Returns a handle to stdout (fd 1).</li>
+<li><code>pub fn stderr() -&gt; ptr ![IO]</code> (<code>@intrinsic(&quot;pie.io_stderr&quot;)</code>) - Returns a handle to stderr (fd 2).</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::json</summary>
+<p>JSON format serialization: integer field parsing and string escaping.</p>
+<ul>
+<li><code>pub fn parse_json_int_field(json_str: string, field_name: string) -&gt; Option[int] ![Pure]</code> - Parses a JSON integer field by name. Returns Some(value) or None.</li>
+<li><code>pub fn escape_json_string(raw: string) -&gt; string ![Pure]</code> (<code>@intrinsic(&quot;pie.json_escape_str&quot;)</code>) - Escapes a raw string for safe embedding in JSON.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::process</summary>
+<p>Process execution: subprocess spawning, pipe redirection, and exit status.</p>
+<ul>
+<li><code>pub fn process_new_c(prog: string) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.process_new&quot;)</code>)</li>
+<li><code>pub fn process_add_arg_c(h: int, a: string) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.process_add_arg&quot;)</code>)</li>
+<li><code>pub fn process_spawn_h(h: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.process_spawn&quot;)</code>)</li>
+<li><code>pub fn process_wait_c(pid: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.process_wait&quot;)</code>)</li>
+<li><code>pub fn process_kill_c(pid: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.process_kill&quot;)</code>)</li>
+<li><code>pub fn process_output_h(h: int) -&gt; ptr ![IO]</code> (<code>@intrinsic(&quot;pie.process_output&quot;)</code>)</li>
+<li><code>pub fn process_config_stdio_c(h: int, which: int, cfg: Stdio) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.process_config_stdio&quot;)</code>)</li>
+<li><code>pub fn process_spawn_piped_c(h: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.process_spawn_piped&quot;)</code>)</li>
+<li><code>pub fn process_write_stdin_c(pid: int, data: string) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.process_write_stdin&quot;)</code>)</li>
+<li><code>pub fn process_read_stdout_c(pid: int) -&gt; string ![IO]</code> (<code>@intrinsic(&quot;pie.process_read_stdout&quot;)</code>)</li>
+<li><code>pub fn process_exit_status_c(pid: int) -&gt; ptr ![IO]</code> (<code>@intrinsic(&quot;pie.process_exit_status&quot;)</code>)</li>
+<li><code>pub enum Stdio</code> - Stdio configuration for subprocess redirection.</li>
+<li><code>pub struct Command</code> - A builder for configuring and spawning a subprocess.</li>
+<li><code>pub struct ChildProcess</code> - A handle to a running child process.</li>
+<li><code>pub struct ExitStatus</code> - The exit status of a terminated process.</li>
+<li><code>pub struct ProcessOutput</code> - The captured output of a completed process.</li>
+<li><code>pub fn new(prog: string) -&gt; Command</code> - Creates a new Command for the given program.</li>
+<li><code>pub fn arg(self, a: string) -&gt; Command</code> - Appends an argument to the command.</li>
+<li><code>pub fn stdin(self, cfg: Stdio) -&gt; Command</code> - Configures stdin redirection.</li>
+<li><code>pub fn stdout(self, cfg: Stdio) -&gt; Command</code> - Configures stdout redirection.</li>
+<li><code>pub fn stderr(self, cfg: Stdio) -&gt; Command</code> - Configures stderr redirection.</li>
+<li><code>pub fn spawn(self) -&gt; Result[ChildProcess, int] ![IO]</code> - Spawns the process with piped stdio. Returns Err(-1) on failure.</li>
+<li><code>pub fn output(self) -&gt; Result[ProcessOutput, int] ![IO]</code> - Runs the process and captures its output. Returns Err(-1) on failure.</li>
+<li><code>pub fn write_stdin(self, data: string) -&gt; Result[int, int] ![IO]</code> - Writes data to the process stdin. Returns Err(errno) on failure.</li>
+<li><code>pub fn read_stdout(self) -&gt; Result[string, int] ![IO]</code> - Reads the process stdout. Returns Err(-1) on failure.</li>
+<li><code>pub fn exit_status(self) -&gt; Result[ExitStatus, int] ![IO]</code> - Returns the exit status after the process has terminated.</li>
+<li><code>pub fn wait(self) -&gt; Result[int, int] ![IO]</code> - Waits for the process to exit and returns its exit code.</li>
+<li><code>pub fn kill(self) -&gt; Result[void, int] ![IO]</code> - Kills the process. Returns Err(errno) on failure.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::random</summary>
+<p>Fast pseudo-random number generator (Xoshiro256**) and OS entropy.</p>
+<ul>
+<li><code>pub struct Rng</code> - State for the Xoshiro256** PRNG. Each Rng advances independently.</li>
+<li><code>pub fn rotl(x: int, k: int) -&gt; int</code> - Rotate-left using logical shift.</li>
+<li><code>pub fn seed(seed_val: int) -&gt; Rng</code> - Creates a new Rng seeded from a single integer.</li>
+<li><code>pub fn next_u64(self) -&gt; int</code> - Advances the generator and returns the raw 64-bit output word.</li>
+<li><code>pub fn next_int(self, min_val: int, max_val: int) -&gt; int</code> - Returns a uniform integer in [min_val, max_val).</li>
+<li><code>pub fn csprng_bytes_c(buf_ptr: ptr, len: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.io_csprng_bytes&quot;)</code>) - Fills a buffer with OS entropy bytes. Returns Err(reason) on failure.</li>
+<li><code>pub fn csprng_u64() -&gt; int ![IO]</code> - Draws one raw 64-bit word of OS entropy. Returns -1 on failure.</li>
+<li><code>pub fn csprng_fill(buf: int[]) -&gt; Result[void, int] ![IO]</code> - Fills a buffer with OS entropy. Returns Err(reason) on failure.</li>
+<li><code>pub fn sample_uniform_float(rng: Rng) -&gt; float&lt;64&gt;</code> - Returns one uniform double in [0.0, 1.0).</li>
+<li><code>pub fn sample_normal(rng: Rng, mean_val: float&lt;64&gt;, std_dev: float&lt;64&gt;) -&gt; float&lt;64&gt;</code> - Box-Muller transform: returns a normal-distributed sample.</li>
+<li><code>pub fn roll_dice(rng: Rng, count: int, sides: int) -&gt; int</code> - Returns the sum of `count` dice each with `sides` faces. Returns 0 for degenerate inputs.</li>
+<li><code>pub fn coin_flip(rng: Rng, probability: float&lt;64&gt;) -&gt; bool</code> - Bernoulli trial: returns true with the given probability.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::serde</summary>
+<p>Serialization and deserialization traits for structured data.</p>
+<ul>
+<li><code>pub trait Serialize</code> - Trait for types that can serialize their fields into a StringBuilder.</li>
+<li><code>pub trait Deserialize</code> - Trait for types that can be deserialized from external data.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::shutdown</summary>
+<p>General-purpose graceful shutdown coordinator.</p>
+<ul>
+<li><code>pub fn init() -&gt; int</code> (<code>@intrinsic(&quot;pie.shutdown_init&quot;)</code>) - Initialize the global shutdown coordinator. Must be called once at startup (from main thread).</li>
+<li><code>pub fn is_requested() -&gt; int</code> (<code>@intrinsic(&quot;pie.shutdown_requested&quot;)</code>) - Check if graceful shutdown has been requested. Returns 1 if shutdown was requested, 0 otherwise.</li>
+<li><code>pub fn request() -&gt; int</code> (<code>@intrinsic(&quot;pie.shutdown_request&quot;)</code>) - Request graceful shutdown. All threads calling requested() will see 1 after this.</li>
+<li><code>pub fn wait_for_completion() -&gt; int</code> (<code>@intrinsic(&quot;pie.shutdown_wait&quot;)</code>) - Wait for all registered workers to finish. Main thread calls this after request() to block until done.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::sync</summary>
+<p>Lock-free MPSC channel and hardware atomic primitives for inter-thread communication.</p>
+<ul>
+<li><code>pub fn channel_create_c() -&gt; ptr ![IO]</code> (<code>@intrinsic(&quot;pie.channel_create&quot;)</code>)</li>
+<li><code>pub fn channel_send_c(chan: ptr, val: int) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.channel_send&quot;)</code>)</li>
+<li><code>pub fn channel_recv_c(chan: ptr, out_val: ptr) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.channel_recv&quot;)</code>)</li>
+<li><code>pub fn channel() -&gt; ptr ![IO]</code> - Creates a new MPSC channel.</li>
+<li><code>pub fn send(ch: ptr, val: int) -&gt; void ![IO]</code> - Sends an integer value through the channel.</li>
+<li><code>pub fn recv(ch: ptr) -&gt; Option[int] ![IO]</code> - Receives a value from the channel, or None if empty.</li>
+<li><code>pub struct AtomicInt</code> - A thread-safe atomic 64-bit integer backed by hardware atomics.</li>
+<li><code>pub fn new(val: int) -&gt; AtomicInt ![IO]</code> - Creates a new atomic integer with the given value.</li>
+<li><code>pub fn load(self) -&gt; int ![IO]</code> - Atomically loads and returns the current value.</li>
+<li><code>pub fn store(self, val: int) -&gt; void ![IO]</code> - Atomically stores the given value.</li>
+<li><code>pub fn fetch_add(self, val: int) -&gt; int ![IO]</code> - Atomically adds val and returns the previous value.</li>
+<li><code>pub fn compare_exchange(self, expected: int, desired: int) -&gt; bool ![IO]</code> - Compare-and-swap: if current == expected, sets to desired. Returns true on success.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::terminal</summary>
+<p>ANSI terminal styling: colors, bold, cursor movement, and raw mode.</p>
+<ul>
+<li><code>pub fn is_tty(fd: int) -&gt; bool ![IO]</code> (<code>@intrinsic(&quot;pie.io_isatty&quot;)</code>) - Returns true if the given file descriptor is a TTY.</li>
+<li><code>pub fn red(s: string) -&gt; string</code> (<code>@intrinsic(&quot;pie.terminal_red&quot;)</code>) - Wraps the string in ANSI red color escapes.</li>
+<li><code>pub fn green(s: string) -&gt; string</code> (<code>@intrinsic(&quot;pie.terminal_green&quot;)</code>) - Wraps the string in ANSI green color escapes.</li>
+<li><code>pub fn yellow(s: string) -&gt; string</code> (<code>@intrinsic(&quot;pie.terminal_yellow&quot;)</code>) - Wraps the string in ANSI yellow color escapes.</li>
+<li><code>pub fn blue(s: string) -&gt; string</code> (<code>@intrinsic(&quot;pie.terminal_blue&quot;)</code>) - Wraps the string in ANSI blue color escapes.</li>
+<li><code>pub fn bold(s: string) -&gt; string</code> (<code>@intrinsic(&quot;pie.terminal_bold&quot;)</code>) - Wraps the string in ANSI bold escapes.</li>
+<li><code>pub fn strip_ansi(s: string) -&gt; string</code> (<code>@intrinsic(&quot;pie.strip_ansi&quot;)</code>) - Strips all ANSI escape sequences from the string.</li>
+<li><code>pub fn enable_raw_mode() -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.io_enable_raw_mode&quot;)</code>) - Enables terminal raw mode (no line buffering).</li>
+<li><code>pub fn disable_raw_mode() -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.io_disable_raw_mode&quot;)</code>) - Disables terminal raw mode, restoring normal buffering.</li>
+<li><code>pub fn read_char() -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.io_read_char&quot;)</code>) - Reads a single keypress in raw mode, returning the character code.</li>
+<li><code>pub fn move_cursor(line: int, col: int) -&gt; void ![IO]</code> - Moves the cursor to the given line and column.</li>
+<li><code>pub fn cursor_up(n: int) -&gt; void ![IO]</code> - Moves the cursor up by n lines.</li>
+<li><code>pub fn cursor_down(n: int) -&gt; void ![IO]</code> - Moves the cursor down by n lines.</li>
+<li><code>pub fn cursor_right(n: int) -&gt; void ![IO]</code> - Moves the cursor right by n columns.</li>
+<li><code>pub fn cursor_left(n: int) -&gt; void ![IO]</code> - Moves the cursor left by n columns.</li>
+<li><code>pub fn clear_screen() -&gt; void ![IO]</code> - Clears the entire screen and moves cursor to top-left.</li>
+<li><code>pub fn clear_line() -&gt; void ![IO]</code> - Clears the current line.</li>
+<li><code>pub fn hide_cursor() -&gt; void ![IO]</code> - Hides the terminal cursor.</li>
+<li><code>pub fn show_cursor() -&gt; void ![IO]</code> - Shows the terminal cursor.</li>
+<li><code>pub fn save_cursor() -&gt; void ![IO]</code> - Saves the current cursor position.</li>
+<li><code>pub fn restore_cursor() -&gt; void ![IO]</code> - Restores the previously saved cursor position.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::thread</summary>
+<p>Thread spawning and joining via native OS threads.</p>
+<ul>
+<li><code>pub fn thread_spawn_c(entry_fn: ptr, arg: ptr) -&gt; ptr ![IO]</code> (<code>@intrinsic(&quot;pie.thread_spawn&quot;)</code>)</li>
+<li><code>pub fn thread_join_c(handle: ptr) -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.thread_join&quot;)</code>)</li>
+<li><code>pub struct ThreadHandle</code> - A handle to a spawned OS thread.</li>
+<li><code>pub fn spawn(entry_fn: ptr) -&gt; ThreadHandle ![IO]</code> - Spawns a new OS thread running entry_fn.</li>
+<li><code>pub fn join(self) -&gt; Result[int, int] ![IO]</code> - Blocks until the thread finishes and returns its exit code.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::time</summary>
+<p>Time utilities: monotonic instants, durations, and thread sleep.</p>
+<ul>
+<li><code>pub fn time_now_nanos() -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.time_now&quot;)</code>) - Returns the current time in nanoseconds since an arbitrary epoch.</li>
+<li><code>pub fn time_sleep_nanos(nanos: int) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.time_sleep&quot;)</code>) - Suspends the calling thread for the given number of nanoseconds.</li>
+<li><code>pub struct Instant</code> - A monotonic timestamp measured in nanoseconds.</li>
+<li><code>pub struct Duration</code> - A duration measured in nanoseconds.</li>
+<li><code>pub fn now() -&gt; Instant ![IO]</code> - Returns the current monotonic instant.</li>
+<li><code>pub fn duration_from_nanos(n: int) -&gt; Duration</code> - Creates a Duration from nanoseconds.</li>
+<li><code>pub fn duration_from_micros(m: int) -&gt; Duration</code> - Creates a Duration from microseconds.</li>
+<li><code>pub fn duration_from_millis(m: int) -&gt; Duration</code> - Creates a Duration from milliseconds.</li>
+<li><code>pub fn duration_from_secs(s: int) -&gt; Duration</code> - Creates a Duration from seconds.</li>
+<li><code>pub fn sub(self, other: Instant) -&gt; Duration</code> - Returns the duration between self and other.</li>
+<li><code>pub fn elapsed(self) -&gt; Duration</code> - Returns the duration elapsed since this instant.</li>
+<li><code>pub fn as_nanos(self) -&gt; int</code> - Returns the duration as nanoseconds.</li>
+<li><code>pub fn as_micros(self) -&gt; int</code> - Returns the duration as microseconds (truncated).</li>
+<li><code>pub fn as_millis(self) -&gt; int</code> - Returns the duration as milliseconds (truncated).</li>
+<li><code>pub fn as_secs(self) -&gt; int</code> - Returns the duration as seconds (truncated).</li>
+<li><code>pub fn add(self, other: Duration) -&gt; Duration</code> - Returns the sum of two durations.</li>
+<li><code>pub fn sub(self, other: Duration) -&gt; Duration</code> - Returns the difference of two durations.</li>
+<li><code>pub fn sleep(d: Duration) -&gt; void ![IO]</code> - Suspends the calling thread for the given duration.</li>
+</ul>
+</details>
+<details>
+<summary>pie::std::unicode</summary>
+<p>Unicode grapheme cluster segmentation and case mapping.</p>
+<ul>
+<li><code>pub fn grapheme_count(s: string) -&gt; int</code> (<code>@intrinsic(&quot;pie.unicode_grapheme_count&quot;)</code>) - Returns the number of Unicode grapheme clusters in a UTF-8 string.</li>
+<li><code>pub fn graphemes(s: string) -&gt; List[string]</code> (<code>@intrinsic(&quot;pie.unicode_graphemes&quot;)</code>) - Splits a string into individual grapheme clusters.</li>
+<li><code>pub fn decode_codepoint(s: string, offset: int, next_off: ptr) -&gt; int</code> (<code>@intrinsic(&quot;pie.unicode_decode&quot;)</code>) - Decodes the code point at a byte offset. Writes next offset to next_off. Returns U+FFFD on malformed input.</li>
+<li><code>pub fn to_uppercase(s: string) -&gt; string</code> (<code>@intrinsic(&quot;pie.unicode_uppercase&quot;)</code>) - Converts a UTF-8 string to uppercase using Unicode case mapping.</li>
+<li><code>pub fn to_lowercase(s: string) -&gt; string</code> (<code>@intrinsic(&quot;pie.unicode_lowercase&quot;)</code>) - Converts a UTF-8 string to lowercase using Unicode case mapping.</li>
+</ul>
+</details>
+</div>
+</details>
 
 <script>
 "use strict";
@@ -360,7 +909,6 @@ function acceptPopup() {
   renderHighlight();
   updateStatus();
   scheduleAuto();
-  scheduleShare();
 }
 
 function indentSelection(dedent) {
@@ -392,7 +940,6 @@ function autoIndent() {
   renderHighlight();
   updateStatus();
   scheduleAuto();
-  scheduleShare();
 }
 
 ta.addEventListener("keydown", (e) => {
@@ -422,12 +969,10 @@ ta.addEventListener("keydown", (e) => {
       renderHighlight();
       updateStatus();
       scheduleAuto();
-  scheduleShare();
     } else {
       indentSelection(e.shiftKey);
     }
     scheduleAuto();
-  scheduleShare();
     return;
   }
   if (e.key === "Enter" && !e.ctrlKey && !e.metaKey) {
@@ -443,7 +988,6 @@ ta.addEventListener("input", () => {
   refreshPopup();
   updateStatus();
   scheduleAuto();
-  scheduleShare();
 });
 ta.addEventListener("scroll", () => {
   syncScroll();
@@ -484,14 +1028,12 @@ tabBtns.forEach((btn) => {
     renderHighlight();
     updateStatus();
     scheduleAuto();
-    scheduleShare();
     ta.focus();
   });
 });
 
 const SHARE_MAX_URL = 8000;
 const SHARE_MAX_BYTES = 4096;
-let shareTimer = 0;
 
 const PIEPACK_DICT =
   "fn main() -> int:\n" +
@@ -677,13 +1219,7 @@ async function inflateB64url(payload) {
   return await new Response(stream).text();
 }
 
-function scheduleShare() {
-  if (shareTimer) clearTimeout(shareTimer);
-  shareTimer = setTimeout(updateShareURL, 500);
-}
-
 async function updateShareURL() {
-  shareTimer = 0;
   try {
     const bytes = new TextEncoder().encode(ta.value);
     if (bytes.length > SHARE_MAX_BYTES) return;
@@ -740,10 +1276,6 @@ $("copy").addEventListener("click", () => {
 });
 
 $("link").addEventListener("click", async () => {
-  if (shareTimer) {
-    clearTimeout(shareTimer);
-    shareTimer = 0;
-  }
   await updateShareURL();
   const done = () => {
     const btn = $("link");
@@ -889,8 +1421,10 @@ $("run").addEventListener("click", () => {
     $("stderr").textContent = err;
     $("msg").textContent =
       "exit " + rc + " · " + ms + " ms" + (err ? " · see error below" : "");
+    updateShareURL();
   } finally {
     $("run").disabled = false;
+    refreshPopup();
   }
 });
 document.addEventListener("keydown", (e) => {
@@ -945,7 +1479,6 @@ renderAuto();
   autosize();
   renderHighlight();
   updateStatus();
-  scheduleShare();
 })();
 boot().then(
   () => {
@@ -955,7 +1488,7 @@ boot().then(
   },
   (e) => {
     $("msg").textContent =
-      " (" + e.message + ") — ";
+      " (" + e.message + ") - ";
   }
 );
 </script>
