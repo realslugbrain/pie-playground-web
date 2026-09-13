@@ -137,6 +137,16 @@ c: Color -> Color::Red</pre>
 <summary>pie::alloc::hashmap</summary>
 <p>Hash map implementation backed by parallel key/value lists.</p>
 <ul>
+<li><code>pub struct HashMap[K, V]</code> - A key-value map. Construct empty with `HashMap[K, V]()` and use the member methods; lookups return `Option[V]`.</li>
+</ul>
+<pre>map: HashMap[string, int] -&gt; HashMap[string, int]()
+map.insert(&quot;apple&quot;, 100)
+println(map.len())
+match map.get(&quot;apple&quot;):
+    Some(val) =&gt; println(val)
+    None =&gt; println(0)
+end</pre>
+<ul>
 </ul>
 </details>
 <details>
@@ -1480,7 +1490,7 @@ renderAuto();
   renderHighlight();
   updateStatus();
   Array.prototype.forEach.call(
-    document.querySelectorAll("details.docs pre"),
+    document.querySelectorAll("details.docs pre, #stdlib-docs li code"),
     (el) => { el.innerHTML = highlightPie(el.textContent); });
 })();
 boot().then(
