@@ -51,10 +51,10 @@
 <details class="docs" open>
 <summary>syntax quick reference</summary>
 <pre>fn main() -> int:
-    x: int -> 5          <i>typed binding</i>
-    y -> 10              <i>inferred binding</i>
-    x <- x + 1           <i>assignment is &lt;-</i>
-    println(x)           <i>with newline (print has none)</i>
+    x: int -> 5          // typed binding
+    y -> 10              // inferred binding
+    x <- x + 1           // assignment is &lt;-
+    println(x)           // with newline (print has none)
     return 0
 end</pre>
 <pre>if x > 0:
@@ -81,7 +81,7 @@ end</pre>
 <pre>name: string -> "Olivia"
 msg: string -> "Hello, $(name)! Seven plus five is $(7 + 5)"</pre>
 <pre>pair: (int, int) -> (3, 4)
-(x, y) -> pair           <i>destructuring declaration</i></pre>
+(x, y) -> pair           // destructuring declaration</pre>
 <pre>l: List[int] -> List[int]()
 l.push(1)
 println(l.get(0))
@@ -98,8 +98,8 @@ println(p.x)</pre>
     Green
 end
 c: Color -> Color::Red</pre>
-<pre>defer println("last")   <i>runs at scope exit, LIFO</i></pre>
-<pre>import pie::std::fs::*   <i>core (println, print_int, ...) auto-imports</i></pre>
+<pre>defer println("last")   // runs at scope exit, LIFO</pre>
+<pre>import pie::std::fs::*   // core (println, print_int, ...) auto-imports</pre>
 </details>
 <details class="docs">
 <summary>standard library reference</summary>
@@ -1479,6 +1479,9 @@ renderAuto();
   autosize();
   renderHighlight();
   updateStatus();
+  Array.prototype.forEach.call(
+    document.querySelectorAll("details.docs pre"),
+    (el) => { el.innerHTML = highlightPie(el.textContent); });
 })();
 boot().then(
   () => {
