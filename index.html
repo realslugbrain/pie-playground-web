@@ -1412,6 +1412,19 @@ async function boot() {
       fd_prestat_get: () => 8,
       fd_prestat_dir_name: () => 0,
       poll_oneoff: (inPtr, outPtr, nsubs, neventsPtr) => {
+        const v = view();
+        let waitMs = 0;
+        for (let i = 0; i < nsubs; i++) {
+          const base = inPtr + i * 48;
+          if (v.getUint32(base + 8, true) === 0) {
+            const ms = Number(v.getBigUint64(base + 24, true) / 1000000n);
+            if (ms > waitMs) waitMs = ms;
+          }
+        }
+        if (waitMs > 0) {
+          const end = performance.now() + waitMs;
+          while (performance.now() < end) { }
+        }
         view().setUint32(neventsPtr, 0, true);
         return 0;
       },
