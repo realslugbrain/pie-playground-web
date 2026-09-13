@@ -213,7 +213,7 @@ button.theme-toggle:hover {
     will-change: transform;
 }
 
-textarea {
+#src {
     position: relative;
     width: 100%;
     min-height: 220px;
@@ -236,7 +236,28 @@ textarea {
     overflow-wrap: break-word;
 }
 
-textarea:focus { outline: none; }
+#src:focus { outline: none; }
+
+#stdin {
+    display: block;
+    width: 100%;
+    min-height: 5rem;
+    max-height: 40vh;
+    resize: vertical;
+    border: none;
+    padding: 0.75rem;
+    background: transparent;
+    color: var(--text);
+    caret-color: var(--accent);
+    font: inherit;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+#stdin::placeholder { color: var(--text-muted); opacity: 1; }
+#stdin:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.stdin-frame { margin-bottom: 0; }
+#stdin-hint { margin: 0.4rem 0 0; }
 
 textarea::selection {
     background-color: var(--selection);
@@ -436,7 +457,7 @@ kbd {
     .status-badge { font-size: 0.68rem; }
     .tab-bar { gap: 0; }
     .tab-btn { padding: 5px 10px; font-size: 0.75rem; }
-    textarea { min-height: 35vh; padding: 0.6rem; }
+    #src { min-height: 35vh; padding: 0.6rem; }
     #backdrop { padding: 0.6rem; }
     button.btn-primary { width: 100%; }
     .code-header { font-size: 0.7rem; padding: 4px 8px; }

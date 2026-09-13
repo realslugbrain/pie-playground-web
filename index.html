@@ -23,6 +23,7 @@
   <button class="tab-btn" data-ex="fizzbuzz" role="tab">fizzbuzz</button>
   <button class="tab-btn" data-ex="gcd" role="tab">gcd</button>
   <button class="tab-btn" data-ex="strings" role="tab">string compare</button>
+  <button class="tab-btn" data-ex="input" role="tab">input</button>
   <button class="tab-btn" data-ex="struct" role="tab">struct</button>
   <button class="tab-btn" data-ex="match" role="tab">match</button>
 </div>
@@ -36,6 +37,13 @@
   </div>
   <ul id="complete" role="listbox" aria-label="completions"></ul>
 </div>
+<div class="code-frame stdin-frame">
+  <div class="code-header"><label for="stdin">stdin</label><button class="copy-btn" id="clear-stdin" type="button" aria-label="Clear standard input">[clear]</button></div>
+  <textarea id="stdin" rows="3" spellcheck="false" autocomplete="off"
+    autocapitalize="off" autocorrect="off" aria-describedby="stdin-hint"
+    placeholder="Text for input(), one response per line"></textarea>
+</div>
+<p class="hint" id="stdin-hint">Each <code>input()</code> reads the next line. Every run starts from the top. Empty input returns an empty string.</p>
 <button id="run" class="btn-primary" disabled>loading…</button>
 <button id="auto" class="toggle-btn" aria-pressed="false">auto: off</button>
 <div id="status"><span id="msg"></span><span class="pos" id="pos"></span></div>
@@ -200,7 +208,7 @@ end</pre>
 <p>Core I/O operations: printing and user input.</p>
 <ul>
 <li><code>pub fn print_str(s: string) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.print_str&quot;)</code>) - Prints a string to stdout.</li>
-<li><code>pub fn input(prompt: string) -&gt; string ![IO]</code> (<code>@intrinsic(&quot;pie.input&quot;)</code>) - Reads a line of input from stdin, using prompt as the prompt string.</li>
+<li><code>pub fn input(prompt: string) -&gt; string ![IO]</code> (<code>@intrinsic(&quot;pie.input&quot;)</code>) - Reads a line of input from stdin, using prompt as the prompt string. Removes the line ending and returns an empty string at EOF. In the WASM playground, fill in the stdin box before running. Each call consumes one line; every run starts from the beginning of that text.</li>
 <li><code>pub fn print_int(val: int) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.print_int&quot;)</code>) - Prints an integer to stdout.</li>
 <li><code>pub fn println(val: int) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.println&quot;)</code>) - Prints an integer followed by a newline to stdout.</li>
 <li><code>pub fn print(val: int) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.print&quot;)</code>) - Prints an integer to stdout (no newline).</li>
@@ -515,6 +523,36 @@ end</pre>
 </ul>
 </details>
 <details>
+<summary>pie::std::string</summary>
+<p>UTF-8 string conveniences. Import this module to enable the string methods. Search positions and lengths are bytes. Returned substrings are copied into NUL-terminated strings; they are not borrowed views. Whitespace means ASCII space, tab, LF, CR, vertical tab, or form feed. No locale names are built in.</p>
+<ul>
+<li><code>pub fn find(self: string, needle: string) -&gt; Option[int] ![Pure]</code> - Returns the first matching byte offset, or None. An empty needle matches at 0.</li>
+<li><code>pub fn rfind(self: string, needle: string) -&gt; Option[int] ![Pure]</code> - Returns the last matching byte offset, or None. An empty needle matches at len().</li>
+<li><code>pub fn contains(self: string, needle: string) -&gt; bool ![Pure]</code> - Returns whether needle occurs anywhere. An empty needle is always contained.</li>
+<li><code>pub fn starts_with(self: string, prefix: string) -&gt; bool ![Pure]</code> - Returns whether self begins with prefix. An empty prefix always matches.</li>
+<li><code>pub fn ends_with(self: string, suffix: string) -&gt; bool ![Pure]</code> - Returns whether self ends with suffix. An empty suffix always matches.</li>
+<li><code>pub fn split(self: string, delimiter: string) -&gt; List[string] ![Pure]</code> - Splits at non-overlapping delimiter matches, retaining empty fields, including trailing ones. An empty delimiter splits at UTF-8 codepoint boundaries with an empty field at both ends (not grapheme boundaries).</li>
+<li><code>pub fn split_once(self: string, delimiter: string) -&gt; Option[(string, string)] ![Pure]</code> - Splits only at the first delimiter, returning Some((head, rest)), or None. With an empty delimiter, returns Some((&quot;&quot;, self)). Substrings are copied.</li>
+<li><code>pub fn lines(self: string) -&gt; List[string] ![Pure]</code> - Splits LF and CRLF lines, removing the line ending. A trailing newline adds no extra line. Empty text gives an empty list; lone CR is retained.</li>
+<li><code>pub fn words(self: string) -&gt; List[string] ![Pure]</code> - Splits contiguous ASCII whitespace, discarding empty tokens. Unicode whitespace such as non-breaking space is retained in tokens.</li>
+<li><code>pub fn trim(self: string) -&gt; string ![Pure]</code> - Removes ASCII whitespace from both ends, returning a copied substring.</li>
+<li><code>pub fn trim_start(self: string) -&gt; string ![Pure]</code> - Removes leading ASCII whitespace, returning a copied substring.</li>
+<li><code>pub fn trim_end(self: string) -&gt; string ![Pure]</code> - Removes trailing ASCII whitespace, returning a copied substring.</li>
+<li><code>pub fn strip_prefix(self: string, prefix: string) -&gt; Option[string] ![Pure]</code> - Removes one matching prefix, returning Some(remainder), or None.</li>
+<li><code>pub fn strip_suffix(self: string, suffix: string) -&gt; Option[string] ![Pure]</code> - Removes one matching suffix, returning Some(remainder), or None.</li>
+<li><code>pub fn replace(self: string, from: string, to: string) -&gt; string ![Pure]</code> - Replaces all non-overlapping matches. An empty from inserts to at every UTF-8 codepoint boundary, including both ends. Returns a new string.</li>
+<li><code>pub fn repeat(self: string, n: int) -&gt; string ![Pure]</code> - Repeats self n times. Nonpositive counts return empty. Panics if the resulting byte length would overflow int; allocation limits still apply.</li>
+<li><code>pub fn join(items: List[string], separator: string) -&gt; string ![Pure]</code> - Joins items with separator using StringBuilder. Empty items give &quot;&quot;.</li>
+</ul>
+<pre>import pie::std::string
+text: string -&gt; &quot;  red,green,blue  &quot;
+clean: string -&gt; text.trim()
+colors: List[string] -&gt; clean.split(&quot;,&quot;)
+println(join(colors, &quot; / &quot;))</pre>
+<ul>
+</ul>
+</details>
+<details>
 <summary>pie::std::sync</summary>
 <p>Lock-free MPSC channel and hardware atomic primitives for inter-thread communication.</p>
 <ul>
@@ -572,9 +610,41 @@ end</pre>
 </details>
 <details>
 <summary>pie::std::time</summary>
-<p>Time utilities: monotonic instants, durations, and thread sleep.</p>
+<p>Time utilities: Unix timestamps, numeric UTC calendar dates, monotonic instants, durations, and thread sleep. Calendar names and formatting belong in application code; this module does not choose a language or locale.</p>
 <ul>
 <li><code>pub fn time_now_nanos() -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.time_now&quot;)</code>) - Returns the current time in nanoseconds since an arbitrary epoch.</li>
+<li><code>pub fn unix_now() -&gt; int ![IO]</code> (<code>@intrinsic(&quot;pie.time_unix&quot;)</code>) - Returns wall-clock seconds since 1970-01-01 00:00:00 UTC (Unix time). Use utc_from_unix() to split a timestamp into calendar fields, or utc_now() to read the clock and split it in one call. Use now() for elapsed timing.</li>
+<li><code>pub struct DateTime</code> - Numeric Gregorian calendar fields. year is the full year (including year 0 and negative years); month is 1-12; day is 1-31 within that month; hour is 0-23; minute and second are 0-59. weekday is 1-7, starting with Monday; day_of_year is 1-366, starting at 1 on the first day of the year. utc_from_unix() and utc_now() return UTC, independent of the host timezone.</li>
+<li><code>pub fn is_leap_year(year: int) -&gt; bool</code> - Returns whether the Gregorian year has 366 days. Century years are leap years only when divisible by 400. The same rule applies to year 0 and BCE.</li>
+<li><code>pub fn days_in_month(year: int, month: int) -&gt; int</code> - Returns 28-31 for a valid month number (1-12), or 0 for an invalid month. Accounts for leap years; no month names are stored or returned.</li>
+<li><code>pub fn utc_from_unix(seconds: int) -&gt; DateTime</code> - Converts signed Unix seconds to numeric UTC fields without reading the clock. Accepts the full int range, including timestamps before 1970. Uses Gregorian rules for all years and 86400-second days (no leap seconds). Does not apply local timezone or daylight-saving rules. For a known fixed UTC offset, add its seconds before conversion, keeping the sum in int range. Define your own labels in Pie. Subtract 1 when indexing a zero-based array:</li>
+</ul>
+<pre>import pie::std::time::*
+
+fn main() -&gt; int ![IO]:
+    months: string[12] -&gt; [&quot;Jan&quot;, &quot;Feb&quot;, &quot;Mar&quot;, &quot;Apr&quot;, &quot;May&quot;, &quot;Jun&quot;,
+                           &quot;Jul&quot;, &quot;Aug&quot;, &quot;Sep&quot;, &quot;Oct&quot;, &quot;Nov&quot;, &quot;Dec&quot;]
+    weekdays: string[7] -&gt; [&quot;Mon&quot;, &quot;Tue&quot;, &quot;Wed&quot;, &quot;Thu&quot;, &quot;Fri&quot;, &quot;Sat&quot;, &quot;Sun&quot;]
+    date: DateTime -&gt; utc_from_unix(1709164800)
+    println(date.year)                     // 2024
+    println(months[date.month - 1])         // Feb (your label)
+    println(date.day)                      // 29
+    println(weekdays[date.weekday - 1])     // Thu (your label)
+    return 0
+end</pre>
+<ul>
+<li><code>pub fn utc_now() -&gt; DateTime ![IO]</code> - Reads the wall clock once and returns its numeric UTC calendar fields. Equivalent to utc_from_unix(unix_now()); requires IO.</li>
+</ul>
+<pre>import pie::std::time::*
+
+fn main() -&gt; int ![IO]:
+    date: DateTime -&gt; utc_now()
+    println(date.year)
+    println(date.month)  // 1-12; supply names in your own Pie code
+    println(date.day)
+    return 0
+end</pre>
+<ul>
 <li><code>pub fn time_sleep_nanos(nanos: int) -&gt; void ![IO]</code> (<code>@intrinsic(&quot;pie.time_sleep&quot;)</code>) - Suspends the calling thread for the given number of nanoseconds.</li>
 <li><code>pub struct Instant</code> - A monotonic timestamp measured in nanoseconds.</li>
 <li><code>pub struct Duration</code> - A duration measured in nanoseconds.</li>
@@ -631,14 +701,14 @@ const BUILTINS = ["region_alloc", "region_realloc", "region_promote",
   "terminal_green", "terminal_yellow", "terminal_blue", "terminal_bold",
   "strip_ansi", "io_enable_raw_mode", "io_disable_raw_mode",
   "io_read_char", "pool_alloc_handle", "pool_get_handle", "time_now",
-  "time_sleep", "env_argc", "env_argv", "env_get_var", "env_set_var",
-  "env_remove_var", "env_has_var", "env_current_dir", "process_new",
-  "process_add_arg", "process_spawn", "process_wait", "process_kill",
-  "process_output", "process_config_stdio", "process_spawn_piped",
-  "process_write_pipe", "process_read_pipe", "process_exit_status",
-  "process_write_stdin", "process_read_stdout", "math_tan_f64",
-  "math_atan2_f64", "math_asin_f64", "math_acos_f64", "math_atan_f64",
-  "bit_lshr_i64", "io_csprng_bytes", "unicode_decode",
+  "time_sleep", "time_unix", "env_argc", "env_argv", "env_get_var",
+  "env_set_var", "env_remove_var", "env_has_var", "env_current_dir",
+  "process_new", "process_add_arg", "process_spawn", "process_wait",
+  "process_kill", "process_output", "process_config_stdio",
+  "process_spawn_piped", "process_write_pipe", "process_read_pipe",
+  "process_exit_status", "process_write_stdin", "process_read_stdout",
+  "math_tan_f64", "math_atan2_f64", "math_asin_f64", "math_acos_f64",
+  "math_atan_f64", "bit_lshr_i64", "io_csprng_bytes", "unicode_decode",
   "unicode_grapheme_count", "unicode_graphemes", "unicode_uppercase",
   "unicode_lowercase", "type_size", "type_align", "async_scope_enter",
   "async_scope_spawn", "async_scope_wait", "async_reactor_init",
@@ -672,7 +742,8 @@ const BUILTINS = ["region_alloc", "region_realloc", "region_promote",
   "ptr_to_string", "len", "push", "pop", "get", "set", "insert",
   "contains", "remove", "open", "create", "close", "read", "write",
   "to_string", "to_float", "append", "concat", "slice", "trim", "sort",
-  "reverse", "map", "filter", "reduce", "panic", "assert", "require"];
+  "reverse", "map", "filter", "reduce", "panic", "assert", "require",
+  "str_find", "str_rfind"];
 const WORDS = KEYWORDS.map((w) => ({ w, kind: "kw" }))
   .concat(BUILTINS.map((w) => ({ w, kind: "fn" })));
 
@@ -683,6 +754,7 @@ const EXAMPLES = {
   fizzbuzz: 'fn main() -> int:\n    for i in 1..16:\n        if i % 15 == 0:\n            println("fizzbuzz")\n        else:\n            if i % 3 == 0:\n                println("fizz")\n            else:\n                if i % 5 == 0:\n                    println("buzz")\n                else:\n                    println(i)\n                end\n            end\n        end\n    end\n    return 0\nend\n',
   gcd: 'fn gcd(a: int, b: int) -> int:\n    if b == 0:\n        return a\n    end\n    return gcd(b, a % b)\nend\nfn main() -> int:\n    println(gcd(48, 18))\n    return 0\nend\n',
   strings: 'fn main() -> int:\n    print("apple" < "banana")\n    print("banana" > "apple")\n    return 0\nend\n',
+  input: 'fn main() -> int:\n    name: string -> input("Name: ")\n    println(name)\n    println(name.len())\n    return 0\nend\n',
   struct: 'struct Point:\n    x: int\n    y: int\nend\nimpl Point:\n    fn norm2(self) -> int:\n        return self.x * self.x + self.y * self.y\n    end\nend\nfn main() -> int:\n    p: Point -> Point{ x -> 3, y -> 4 }\n    println(p.norm2())\n    return 0\nend\n',
   match: 'enum Shape:\n    Circle(r: int)\n    Rectangle(w: int, h: int)\nend\nfn area2(s: Shape) -> int:\n    match s:\n        Circle(r) => return 3 * r * r\n        Rectangle(w, h) => return w * h\n    end\n    return 0 - 1\nend\nfn main() -> int:\n    println(area2(Shape::Circle(2)))\n    println(area2(Shape::Rectangle(3, 4)))\n    return 0\nend\n',
 };
@@ -759,6 +831,7 @@ const mirror = document.createElement("div");
   mirror.style.top = "0";
   mirror.style.left = "0";
   mirror.style.width = ta.clientWidth + "px";
+  mirror.style.maxWidth = "100%";
   mirror.style.whiteSpace = "pre-wrap";
   mirror.style.wordWrap = "break-word";
   document.body.appendChild(mirror);
@@ -1334,21 +1407,27 @@ function slurp(ptr) {
   return dec.decode(m.subarray(ptr, end));
 }
 
-function runPie(source) {
+function runPie(source, input = "") {
   const exp = instance.exports;
   const src = enc.encode(source);
+  const stdin = enc.encode(input);
   const OUT = 2097152, ERR = 16384;
   const pSrc = exp.malloc(src.length + 1);
+  const pInput = exp.malloc(stdin.length + 1);
   const pOut = exp.malloc(OUT);
   const pErr = exp.malloc(ERR);
   try {
     const m = new Uint8Array(exp.memory.buffer);
     m.set(src, pSrc);
     m[pSrc + src.length] = 0;
-    const rc = exp.pie_web_eval(pSrc, pOut, OUT, pErr, ERR, 0n);
+    m.set(stdin, pInput);
+    m[pInput + stdin.length] = 0;
+    const rc = exp.pie_web_eval_with_input(pSrc, pInput, stdin.length,
+                                          pOut, OUT, pErr, ERR, 0n);
     return { rc, out: slurp(pOut), err: slurp(pErr) };
   } finally {
     exp.free(pSrc);
+    exp.free(pInput);
     exp.free(pOut);
     exp.free(pErr);
   }
@@ -1438,7 +1517,7 @@ $("run").addEventListener("click", () => {
   $("run").disabled = true;
   try {
     const t0 = performance.now();
-    const { rc, out, err } = runPie($("src").value);
+    const { rc, out, err } = runPie($("src").value, $("stdin").value);
     const ms = (performance.now() - t0).toFixed(1);
     $("stdout").textContent = out;
     $("stderr").textContent = err;
@@ -1478,6 +1557,13 @@ function scheduleAuto() {
     if (!$("run").disabled) $("run").click();
   }, 600);
 }
+
+$("stdin").addEventListener("input", scheduleAuto);
+$("clear-stdin").addEventListener("click", () => {
+  $("stdin").value = "";
+  $("stdin").focus();
+  scheduleAuto();
+});
 
 $("auto").addEventListener("click", () => {
   autoRun = !autoRun;
