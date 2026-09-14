@@ -28,7 +28,7 @@
   <button class="tab-btn" data-ex="match" role="tab">match</button>
 </div>
 <div class="code-frame">
-  <div class="code-header"><span id="filename">hello world</span><span><button class="copy-btn" id="copy">[copy]</button> <button class="copy-btn" id="link">[link]</button></span></div>
+  <div class="code-header"><span id="filename">hello world</span><span><button class="copy-btn" id="copy">[copy]</button> <button class="copy-btn" id="link" title="Copy a share link, or save a file if the code is too large">[link]</button> <button class="copy-btn" id="save-code" title="Save code as a .pie file">[save]</button> <button class="copy-btn" id="open-code" title="Open a UTF-8 .pie file (up to 2 MB)">[open]</button></span></div>
   <div class="editor-wrap">
     <pre id="backdrop" aria-hidden="true"></pre>
     <textarea id="src" spellcheck="false" autocomplete="off"
@@ -37,6 +37,8 @@
   </div>
   <ul id="complete" role="listbox" aria-label="completions"></ul>
 </div>
+<input id="code-file" type="file" accept=".pie,text/plain" hidden>
+<p class="hint" id="share-status" role="status" hidden></p>
 <div class="code-frame stdin-frame">
   <div class="code-header"><label for="stdin">stdin</label><button class="copy-btn" id="clear-stdin" type="button" aria-label="Clear standard input">[clear]</button></div>
   <textarea id="stdin" rows="3" spellcheck="false" autocomplete="off"
@@ -1145,7 +1147,8 @@ tabBtns.forEach((btn) => {
 });
 
 const SHARE_MAX_URL = 8000;
-const SHARE_MAX_BYTES = 4096;
+const SHARE_MAX_BYTES = 2 * 1024 * 1024; // decoded UTF-8 / file limit
+const SHARE_MAX_ENCODED = Math.ceil(SHARE_MAX_BYTES * 4 / 3) + 256;
 
 const PIEPACK_DICT =
   "fn main() -> int:\n" +
@@ -1216,55 +1219,9 @@ const PIEPACK_MINLEN = 3;
 const PIEPACK_MAXLEN = 34;
 const PIEPACK_WIN = 3072;
 
-function piepackEncodeBytes(src) {
-  const bits = [];
-  const push = (val, n) => {
-    for (let i = n - 1; i >= 0; i--) bits.push((val >> i) & 1);
-  };
-  let sum = 0;
-  for (let i = 0; i < src.length; i++) sum = (sum + src[i]) & 255;
-  push(src.length, 16);
-  push(sum, 8);
-  const dictLen = PIEPACK_DICT.length;
-  let i = 0;
-  while (i < src.length) {
-    let bestLen = 0, bestKind = 0, bestOff = 0;
-    for (let o = 0; o < dictLen; o++) {
-      let l = 0;
-      while (l < PIEPACK_MAXLEN && i + l < src.length &&
-             o + l < dictLen &&
-             PIEPACK_DICT.charCodeAt(o + l) === src[i + l]) l++;
-      if (l > bestLen) { bestLen = l; bestKind = 0; bestOff = o; }
-      if (bestLen === PIEPACK_MAXLEN) break;
-    }
-    const wfrom = Math.max(0, i - PIEPACK_WIN);
-    for (let o = wfrom; o < i; o++) {
-      let l = 0;
-      while (l < PIEPACK_MAXLEN && i + l < src.length &&
-             src[o + l] === src[i + l]) l++;
-      if (l > bestLen) { bestLen = l; bestKind = 1; bestOff = i - o; }
-      if (bestLen === PIEPACK_MAXLEN) break;
-    }
-    if (bestLen >= PIEPACK_MINLEN) {
-      push(1, 1);
-      push(bestKind, 1);
-      push(bestKind === 0 ? bestOff : bestOff - 1 + 1024, 12);
-      push(bestLen - PIEPACK_MINLEN, 5);
-      i += bestLen;
-    } else {
-      push(0, 1);
-      push(src[i], 8);
-      i++;
-    }
-  }
-  const out = new Uint8Array(Math.ceil(bits.length / 8));
-  for (let k = 0; k < bits.length; k++) {
-    if (bits[k]) out[k >> 3] |= 1 << (7 - (k & 7));
-  }
-  return out;
-}
-
 function piepackDecodeBytes(buf) {
+  // The legacy format has a 16-bit decoded length and at most 9 bits per byte.
+  if (buf.length > 73732) throw new Error("Invalid legacy shared link");
   const bits = [];
   for (let b = 0; b < buf.length; b++) {
     for (let i = 7; i >= 0; i--) bits.push((buf[b] >> i) & 1);
@@ -1272,7 +1229,8 @@ function piepackDecodeBytes(buf) {
   let p = 0;
   const take = (n) => {
     let v = 0;
-    for (let k = 0; k < n; k++) v = (v << 1) | (bits[p++] || 0);
+    if (p + n > bits.length) throw new Error("Incomplete shared code");
+    for (let k = 0; k < n; k++) v = (v << 1) | bits[p++];
     return v;
   };
   const len = take(16);
@@ -1284,12 +1242,13 @@ function piepackDecodeBytes(buf) {
       const kind = take(1);
       const off = take(12);
       const ln = take(5) + PIEPACK_MINLEN;
+      if (out.length + ln > len) throw new Error("Invalid shared code length");
       if (kind === 0) {
         if (off + ln > dictLen) throw new Error("piepack: bad dict ref");
         for (let k = 0; k < ln; k++) out.push(PIEPACK_DICT.charCodeAt(off + k));
       } else {
         const from = out.length - (off - 1024 + 1);
-        if (from < 0) throw new Error("piepack: bad window ref");
+        if (off < 1024 || from < 0 || from >= out.length) throw new Error("piepack: bad window ref");
         for (let k = 0; k < ln; k++) out.push(out[from + k]);
       }
     } else {
@@ -1320,49 +1279,343 @@ function b64urlDecode(payload) {
   return bytes;
 }
 
-async function inflateB64url(payload) {
-  let b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-  while (b64.length % 4 !== 0) b64 += "=";
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  const stream = new Blob([bytes]).stream()
-    .pipeThrough(new DecompressionStream("deflate-raw"));
-  return await new Response(stream).text();
+// Versioned links include the decoded size and checksum, so truncated links
+// cannot silently load a partial (or empty) program. Keep old ?code= links readable.
+function shareChecksum(bytes) {
+  let a = 1, b = 0;
+  for (const byte of bytes) {
+    a = (a + byte) % 65521;
+    b = (b + a) % 65521;
+  }
+  return (((b << 16) | a) >>> 0).toString(16).padStart(8, "0");
 }
 
-async function updateShareURL() {
+async function readShareStream(stream, limit = SHARE_MAX_BYTES) {
+  const reader = stream.getReader();
+  const chunks = [];
+  let size = 0;
   try {
-    const bytes = new TextEncoder().encode(ta.value);
-    if (bytes.length > SHARE_MAX_BYTES) return;
-    const payload = b64urlEncode(piepackEncodeBytes(bytes));
-    if (payload.length > SHARE_MAX_URL) return;
-    const url = new URL(window.location.href);
-    url.searchParams.set("code", payload);
-    window.history.replaceState(null, "", url);
-  } catch (e) {  }
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) throw new Error("Shared code exceeds the 2 MB limit");
+      chunks.push(value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+// Frozen v3 dictionary: changing entries or their order breaks existing links.
+// Tokens replace exact byte sequences, including inside comments and strings;
+// decoding restores every byte. Non-ASCII bytes use an escape marker.
+const SHARE_V3_DICT = [
+  "fn main() -> int:\n",
+  "    return 0\nend\n",
+  "import pie::",
+  "    println(",
+  "        ",
+  "    ",
+  "\nend\n",
+  "pub fn ",
+  "fn ",
+  " -> ",
+  " <- ",
+  " => ",
+  ": string",
+  ": int",
+  ": bool",
+  ": float",
+  " ![Pure]",
+  " ![IO]",
+  "return ",
+  "println(",
+  "print(",
+  "while ",
+  "for ",
+  " in ",
+  "if ",
+  "else:",
+  "end",
+  "match ",
+  "struct ",
+  "enum ",
+  "impl ",
+  "self",
+  "true",
+  "false",
+  "string",
+  "int",
+  "float",
+  "bool",
+  "List[",
+  "Option[",
+  "Option::Some(",
+  "Option::None",
+  "StringBuilder",
+  ".len()",
+  "::",
+  "==",
+  "!=",
+  "<=",
+  ">=",
+  "&&",
+  "||",
+  "..",
+  "\")\n",
+  "()",
+  "\n\n",
+  "// ",
+  "/// ",
+  "module pie::",
+  "std::",
+  "core::",
+  "alloc::",
+  ", ",
+  " + ",
+  " - ",
+  " * ",
+  " / ",
+  " % ",
+  "\n    end\n",
+  "\n        end\n",
+  "return 0",
+  "\n    ",
+  "\n        ",
+  "main",
+  "Some(",
+  "None",
+  "mut ",
+  "pub ",
+  "unsafe:",
+  "end\n",
+  "\n"
+];
+
+const SHARE_V3_PREFIXES = (() => {
+  const buckets = Array.from({ length: 128 }, () => []);
+  SHARE_V3_DICT.forEach((text, token) => {
+    const bytes = new TextEncoder().encode(text);
+    if (bytes.length > 1) buckets[bytes[0]].push({ bytes, token: token + 128 });
+  });
+  buckets.forEach(bucket => bucket.sort((a, b) => b.bytes.length - a.bytes.length));
+  return buckets;
+})();
+
+function packShareTokens(bytes) {
+  const out = new Uint8Array(bytes.length * 2);
+  let written = 0;
+  for (let i = 0; i < bytes.length;) {
+    const byte = bytes[i];
+    if (byte >= 128) {
+      out[written++] = 255;
+      out[written++] = byte;
+      i++;
+      continue;
+    }
+    let match = null;
+    for (const entry of SHARE_V3_PREFIXES[byte]) {
+      if (i + entry.bytes.length > bytes.length) continue;
+      let j = 1;
+      while (j < entry.bytes.length && bytes[i + j] === entry.bytes[j]) j++;
+      if (j === entry.bytes.length) { match = entry; break; }
+    }
+    if (match) {
+      out[written++] = match.token;
+      i += match.bytes.length;
+    } else {
+      out[written++] = byte;
+      i++;
+    }
+  }
+  return out.subarray(0, written);
+}
+
+function unpackShareTokens(bytes, size) {
+  const out = new Uint8Array(size);
+  let written = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    const byte = bytes[i];
+    if (byte === 255) {
+      if (++i >= bytes.length || written >= size)
+        throw new Error("Invalid shared code escape");
+      out[written++] = bytes[i];
+    } else if (byte >= 128) {
+      const word = SHARE_V3_DICT[byte - 128];
+      if (word === undefined || written + word.length > size)
+        throw new Error("Invalid shared code token");
+      for (let j = 0; j < word.length; j++) out[written++] = word.charCodeAt(j);
+    } else {
+      if (written >= size) throw new Error("Invalid shared code length");
+      out[written++] = byte;
+    }
+  }
+  if (written !== size) throw new Error("Shared link is incomplete or damaged");
+  return out;
+}
+
+async function encodeSharedCode(text) {
+  const bytes = new TextEncoder().encode(text);
+  if (bytes.length > SHARE_MAX_BYTES) return null;
+  const tokens = packShareTokens(bytes);
+  const candidates = [{ bytes, format: 0 }, { bytes: tokens, format: 2 }];
+  if (typeof CompressionStream !== "undefined") {
+    await Promise.all([bytes, tokens].map(async (input, index) => {
+      // Raw deflate omits the zlib wrapper; our envelope already checks size
+      // and checksum. Fall back to zlib on browsers without raw stream support.
+      for (const [codec, format] of [["deflate-raw", 4 + index], ["deflate", 1 + index * 2]]) {
+        try {
+          const packed = await readShareStream(new Blob([input]).stream()
+            .pipeThrough(new CompressionStream(codec)), SHARE_MAX_BYTES * 2 + 65536);
+          candidates.push({ bytes: packed, format });
+          break;
+        } catch (error) { /* Try the next supported codec or use literal bytes. */ }
+      }
+    }));
+  }
+  candidates.sort((a, b) => a.bytes.length - b.bytes.length || a.format - b.format);
+  const best = candidates[0];
+  // One format byte, four length bytes, four checksum bytes. A binary header
+  // is shorter than putting decimal length and hex checksum directly in a URL.
+  const envelope = new Uint8Array(9 + best.bytes.length);
+  const header = new DataView(envelope.buffer);
+  header.setUint8(0, best.format);
+  header.setUint32(1, bytes.length);
+  header.setUint32(5, parseInt(shareChecksum(bytes), 16));
+  envelope.set(best.bytes, 9);
+  return "v3." + b64urlEncode(envelope);
+}
+
+async function decodeSharedCode(payload) {
+  if (payload.length > SHARE_MAX_ENCODED) throw new Error("Shared link is too large");
+  const utf8 = new TextDecoder("utf-8", { fatal: true });
+  if (payload.startsWith("v3.")) {
+    if (!/^v3\.[A-Za-z0-9_-]+$/.test(payload)) throw new Error("Invalid shared link");
+    const envelope = b64urlDecode(payload.slice(3));
+    if (envelope.length < 9) throw new Error("Incomplete shared link header");
+    const header = new DataView(envelope.buffer, envelope.byteOffset, envelope.byteLength);
+    const format = header.getUint8(0);
+    const size = header.getUint32(1);
+    const checksum = header.getUint32(5);
+    if (format > 5) throw new Error("Unknown shared link format");
+    if (size > SHARE_MAX_BYTES) throw new Error("Shared code exceeds the 2 MB limit");
+    let bytes = envelope.subarray(9);
+    const tokenized = format === 2 || format === 3 || format === 5;
+    if (format !== 0 && format !== 2) {
+      if (typeof DecompressionStream === "undefined")
+        throw new Error("This browser cannot open compressed links; ask for a .pie file");
+      bytes = await readShareStream(new Blob([bytes]).stream()
+        .pipeThrough(new DecompressionStream(format >= 4 ? "deflate-raw" : "deflate")),
+        tokenized ? size * 2 : size);
+    }
+    if (tokenized) bytes = unpackShareTokens(bytes, size);
+    if (bytes.length !== size || parseInt(shareChecksum(bytes), 16) !== checksum)
+      throw new Error("Shared link is incomplete or damaged");
+    return utf8.decode(bytes);
+  }
+  if (payload.startsWith("v2.")) {
+    const match = /^v2\.([uz])\.(\d+)\.([0-9a-f]{8})\.([A-Za-z0-9_-]*)$/.exec(payload);
+    if (!match) throw new Error("Invalid shared link");
+    const size = Number(match[2]);
+    if (!Number.isSafeInteger(size) || size > SHARE_MAX_BYTES)
+      throw new Error("Shared code exceeds the 2 MB limit");
+    let bytes = b64urlDecode(match[4]);
+    if (match[1] === "z") {
+      if (typeof DecompressionStream === "undefined")
+        throw new Error("This browser cannot open compressed links; ask for a .pie file");
+      bytes = await readShareStream(new Blob([bytes]).stream()
+        .pipeThrough(new DecompressionStream("deflate")), size);
+    }
+    if (bytes.length !== size || shareChecksum(bytes) !== match[3])
+      throw new Error("Shared link is incomplete or damaged");
+    return utf8.decode(bytes);
+  }
+  if (payload.startsWith("1_")) {
+    return utf8.decode(await readShareStream(new Blob([b64urlDecode(payload.slice(2))]).stream()
+      .pipeThrough(new DecompressionStream("deflate-raw"))));
+  }
+  try {
+    return utf8.decode(piepackDecodeBytes(b64urlDecode(payload)));
+  } catch (error) {
+    // Earliest links used raw deflate without a version prefix.
+    return utf8.decode(await readShareStream(new Blob([b64urlDecode(payload)]).stream()
+      .pipeThrough(new DecompressionStream("deflate-raw"))));
+  }
+}
+
+function showShareStatus(message) {
+  $("share-status").textContent = message;
+  $("share-status").hidden = !message;
+}
+
+function cleanShareURL() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("code");
+  if (url.hash.startsWith("#code=")) url.hash = "";
+  return url;
+}
+
+async function makeShareURL(text) {
+  const payload = await encodeSharedCode(text);
+  if (payload === null) return null;
+  const url = cleanShareURL();
+  // Fragments stay in the browser instead of hitting server request-size limits.
+  url.hash = "code=" + payload;
+  return url.href.length <= SHARE_MAX_URL ? url.href : null;
 }
 
 async function loadSharedCode() {
+  const url = new URL(window.location.href);
+  const payload = url.hash.startsWith("#code=")
+    ? url.hash.slice(6) : url.searchParams.get("code");
+  if (payload === null) return false;
   try {
-    const params = new URL(window.location.href).searchParams;
-    const payload = params.get("code");
-    if (!payload) return false;
-    let text = null;
-    try {
-      text = new TextDecoder().decode(
-        piepackDecodeBytes(b64urlDecode(payload)));
-    } catch (e) {
-      try {
-        text = await inflateB64url(payload.replace(/^1_/, ""));
-      } catch (e2) {
-        return false;
-      }
-    }
-    if (typeof text !== "string" || text.length === 0) return false;
-    ta.value = text;
+    ta.value = await decodeSharedCode(payload);
     return true;
-  } catch (e) { return false; }
+  } catch (error) {
+    showShareStatus("Could not load shared code: " + error.message +
+      ". Ask the sender for a new link or a .pie file, then use [open].");
+    return false;
+  }
+}
+
+function saveCodeFile(text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "playground.pie";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+async function copyShareLink(url) {
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch (error) {
+    const field = document.createElement("textarea");
+    field.value = url;
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.appendChild(field);
+    field.select();
+    const copied = document.execCommand("copy");
+    field.remove();
+    ta.focus();
+    if (!copied) throw new Error("Clipboard unavailable; copy the link from the address bar");
+  }
 }
 
 $("copy").addEventListener("click", () => {
@@ -1388,16 +1641,57 @@ $("copy").addEventListener("click", () => {
 });
 
 $("link").addEventListener("click", async () => {
-  await updateShareURL();
-  const done = () => {
-    const btn = $("link");
-    btn.textContent = "[copied!]";
-    setTimeout(() => { btn.textContent = "[link]"; }, 1200);
-  };
+  const button = $("link");
+  const source = ta.value;
+  button.disabled = true;
+  button.textContent = "[sharing…]";
   try {
-    await navigator.clipboard.writeText(window.location.href);
-    done();
-  } catch (e) {  }
+    const url = await makeShareURL(source);
+    if (url === null) {
+      window.history.replaceState(null, "", cleanShareURL());
+      saveCodeFile(source);
+      showShareStatus("Code is too large for a reliable link. Saved playground.pie instead — send the file and have the recipient use [open].");
+    } else {
+      window.history.replaceState(null, "", url);
+      await copyShareLink(url);
+      showShareStatus("Link copied.");
+    }
+  } catch (error) {
+    showShareStatus("Could not copy the link: " + error.message + ". You can also use [save] to share a .pie file.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "[link]";
+  }
+});
+
+$("save-code").addEventListener("click", () => {
+  saveCodeFile(ta.value);
+  showShareStatus("Saved playground.pie. Send this file; the recipient can load it with [open].");
+});
+$("open-code").addEventListener("click", () => $("code-file").click());
+$("code-file").addEventListener("change", async () => {
+  const file = $("code-file").files[0];
+  if (!file) return;
+  try {
+    if (file.size > SHARE_MAX_BYTES) throw new Error("Files must be 2 MB or smaller");
+    const source = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
+    ta.value = source;
+    window.history.replaceState(null, "", cleanShareURL());
+    tabBtns.forEach((b) => b.classList.remove("active"));
+    $("filename").textContent = file.name;
+    ta.scrollTop = 0;
+    autosize();
+    renderHighlight();
+    hidePopup();
+    updateStatus();
+    // Opening shared code is an edit; leave execution to the Run button.
+    if (autoTimer) { clearTimeout(autoTimer); autoTimer = 0; }
+    showShareStatus("Opened " + file.name + ". Press run to execute it.");
+  } catch (error) {
+    showShareStatus("Could not open file: " + error.message + ". Your code has not been changed.");
+  } finally {
+    $("code-file").value = "";
+  }
 });
 
 (function initTheme() {
@@ -1552,7 +1846,6 @@ $("run").addEventListener("click", () => {
     $("stderr").textContent = err;
     $("msg").textContent =
       "exit " + rc + " · " + ms + " ms" + (err ? " · see error below" : "");
-    updateShareURL();
   } finally {
     $("run").disabled = false;
     refreshPopup();
