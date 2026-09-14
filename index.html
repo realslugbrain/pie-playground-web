@@ -155,6 +155,13 @@ match map.get(&quot;apple&quot;):
     None =&gt; println(0)
 end</pre>
 <ul>
+<li><code>pub fn new() -&gt; HashMap[K, V]</code> - Creates an empty map backed by parallel key/value lists.</li>
+<li><code>pub fn insert(self, k: K, v: V) -&gt; void</code> - Inserts or replaces the value for k via linear search (O(n)). Rebuilds the parallel lists so no in-place element store is needed.</li>
+<li><code>pub fn get(self, k: K) -&gt; Option[V]</code> - Returns the value for k, or None when k is absent (O(n) search).</li>
+<li><code>pub fn len(self) -&gt; int</code> - Returns the number of entries in the map.</li>
+<li><code>pub fn length(self) -&gt; int</code> - Returns the number of entries in the map (alias for len).</li>
+<li><code>pub fn contains(self, k: K) -&gt; bool</code> - Returns true when k maps to some value (O(n) search, no get call so hijacked-name dispatch can never reroute this method).</li>
+<li><code>pub fn is_empty(self) -&gt; bool</code> - Returns true when the map holds no entries. Delegates to len() so both struct-backed and native-backed maps answer correctly on every engine (len nodes dispatch per shape).</li>
 </ul>
 </details>
 <details>
@@ -179,12 +186,29 @@ end</pre>
 <summary>pie::alloc::set</summary>
 <p>Hash set implementation backed by a HashMap to integer markers.</p>
 <ul>
+<li><code>pub fn new() -&gt; Set[T]</code> - Creates an empty set backed by an inner HashMap to marker bytes.</li>
+<li><code>pub fn add(self, v: T) -&gt; void</code> - Adds v to the set; adding a present value keeps size unchanged. Operates on a local alias of the inner map so only identifier receivers reach the map methods, then writes the alias back.</li>
+<li><code>pub fn contains(self, v: T) -&gt; bool</code> - Returns true when v is a member of the set.</li>
+<li><code>pub fn len(self) -&gt; int</code> - Returns the number of distinct members in the set.</li>
+<li><code>pub fn length(self) -&gt; int</code> - Returns the number of distinct members (alias for len).</li>
+<li><code>pub fn is_empty(self) -&gt; bool</code> - Returns true when the set holds no members. Delegates to len() so both struct-backed and native-backed sets answer correctly on every engine (len nodes dispatch per shape).</li>
 </ul>
 </details>
 <details>
 <summary>pie::alloc::string_builder</summary>
 <p>Efficient string builder with region-backed buffer management.</p>
 <ul>
+<li><code>pub unsafe fn null_ptr() -&gt; ptr</code> (<code>@intrinsic(&quot;pie.null_ptr&quot;)</code>)</li>
+<li><code>pub unsafe fn set_ptr_offset(p: ptr, offset: int, value: int) -&gt; void</code> (<code>@intrinsic(&quot;pie.ptr_set_offset&quot;)</code>)</li>
+<li><code>pub unsafe fn get_ptr_offset(p: ptr, offset: int) -&gt; int</code> (<code>@intrinsic(&quot;pie.ptr_get_offset&quot;)</code>)</li>
+<li><code>pub fn ptr_to_string(p: ptr) -&gt; string</code> (<code>@intrinsic(&quot;pie.ptr_to_string&quot;)</code>) - Copy a C NUL-terminated string into region memory.</li>
+<li><code>pub fn new() -&gt; StringBuilder</code> - Creates an empty builder with a null byte buffer.</li>
+<li><code>pub fn append_str(self, s: string) -&gt; void</code> - Appends every byte of s, growing the buffer as needed. Bytes are stored contiguously: each byte is written with an 8-byte offset store whose low byte lands at the target index, so the buffer always holds the exact byte sequence plus trailing zeros. Capacity keeps 8 bytes of slack for the widest store.</li>
+<li><code>pub fn append_int(self, v: int) -&gt; void</code> - Appends the decimal rendering of v (handles zero, negatives, and INT_MIN without negating it). Digits are extracted into a fixed array, then emitted most-significant first as ASCII bytes.</li>
+<li><code>pub fn to_string(self) -&gt; string</code> - Copies the buffered bytes into a fresh NUL-terminated string.</li>
+<li><code>pub fn len(self) -&gt; int</code> - Returns the number of buffered bytes.</li>
+<li><code>pub fn length(self) -&gt; int</code> - Returns the number of buffered bytes (alias for len).</li>
+<li><code>pub fn is_empty(self) -&gt; bool</code> - Returns true when no bytes have been appended. Delegates to len() so both struct-backed and native-backed builders answer correctly on every engine.</li>
 </ul>
 </details>
 <details>
