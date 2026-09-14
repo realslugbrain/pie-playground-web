@@ -145,7 +145,7 @@ c: Color -> Color::Red</pre>
 <summary>pie::alloc::hashmap</summary>
 <p>Hash map implementation backed by parallel key/value lists.</p>
 <ul>
-<li><code>pub struct HashMap[K, V]</code> - A key-value map. Construct empty with `HashMap[K, V]()` and use the member methods; lookups return `Option[V]`.</li>
+<li><code>pub struct HashMap[K, V]</code> (<code>@builtin(&quot;map&quot;)</code>) - A key-value map. Construct empty with `HashMap[K, V]()` and use the member methods; lookups return `Option[V]`.</li>
 </ul>
 <pre>map: HashMap[string, int] -&gt; HashMap[string, int]()
 map.insert(&quot;apple&quot;, 100)
@@ -164,7 +164,7 @@ end</pre>
 <li><code>pub unsafe fn null_ptr() -&gt; ptr</code> (<code>@intrinsic(&quot;pie.null_ptr&quot;)</code>)</li>
 <li><code>pub unsafe fn set_ptr_offset(p: ptr, offset: int, value: int) -&gt; void</code> (<code>@intrinsic(&quot;pie.ptr_set_offset&quot;)</code>)</li>
 <li><code>pub unsafe fn get_ptr_offset(p: ptr, offset: int) -&gt; int</code> (<code>@intrinsic(&quot;pie.ptr_get_offset&quot;)</code>)</li>
-<li><code>pub struct List[T]</code> - A growable array allocated in the active RBMM region.</li>
+<li><code>pub struct List[T]</code> (<code>@builtin(&quot;list&quot;)</code>) - A growable array allocated in the active RBMM region.</li>
 <li><code>pub fn new() -&gt; List[T]</code> - Creates an empty list.</li>
 <li><code>pub fn push(self, item: T) -&gt; void</code> - Appends an item to the end of the list, growing if needed.</li>
 <li><code>pub fn get(self, index: int) -&gt; Option[T]</code> - Returns the element at index, or None if out of bounds.</li>
@@ -290,7 +290,7 @@ end</pre>
 <summary>pie::core::range</summary>
 <p>Half-open range type: represents [start, end) intervals.</p>
 <ul>
-<li><code>pub struct Range[T]</code> - A half-open range [start, end). Used for iteration and slicing.</li>
+<li><code>pub struct Range[T]</code> (<code>@builtin(&quot;range&quot;)</code>) - A half-open range [start, end). Used for iteration and slicing.</li>
 <li><code>pub fn contains(self, val: int) -&gt; bool ![Pure]</code> - Returns true if val is within [start, end).</li>
 <li><code>pub fn len(self) -&gt; int ![Pure]</code> - Returns the number of integers in the range.</li>
 <li><code>pub fn is_empty(self) -&gt; bool ![Pure]</code> - Returns true if the range is empty.</li>
