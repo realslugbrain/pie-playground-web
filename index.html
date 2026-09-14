@@ -1413,6 +1413,67 @@ const SHARE_V3_PREFIXES = (() => {
   return buckets;
 })();
 
+// Frozen v5 snippets: numbers are capture placeholders, not literal code.
+// Matching repeated identifiers lets a loop encode its variable name once.
+// Never change these IDs or pieces: shared links depend on their meaning.
+const SHARE_V5_TEMPLATES = [
+  { pattern: /^fn main\(\) -> int:\n    println\("((?:[^"\\\r\n]|\\.)*)"\)\n    println\(([^\r\n]*)\)\n    return 0\nend\n/gm,
+    fields: 2, pieces: ['fn main() -> int:\n    println("', 0, '")\n    println(', 1, ')\n    return 0\nend\n'] },
+  { pattern: /^fn main\(\) -> int:\n    println\("((?:[^"\\\r\n]|\\.)*)"\)\n    return 0\nend\n/gm,
+    fields: 1, pieces: ['fn main() -> int:\n    println("', 0, '")\n    return 0\nend\n'] },
+  { pattern: /^    for ([A-Za-z_][A-Za-z0-9_]*) in ([^\r\n]+):\n        ([A-Za-z_][A-Za-z0-9_]*) <- \3 ([+*\/%-]) \1\n    end\n/gm,
+    fields: 4, pieces: ['    for ', 0, ' in ', 1, ':\n        ', 2, ' <- ', 2, ' ', 3, ' ', 0, '\n    end\n'] },
+  { pattern: /^    if ([^\r\n]+):\n        return ([^\r\n]+)\n    end\n/gm,
+    fields: 2, pieces: ['    if ', 0, ':\n        return ', 1, '\n    end\n'] },
+  { pattern: /^fn ([A-Za-z_][A-Za-z0-9_]*)\(([^\r\n]*)\) -> ([^:\r\n]+):\n/gm,
+    fields: 3, pieces: ['fn ', 0, '(', 1, ') -> ', 2, ':\n'] },
+  { pattern: /^    println\("((?:[^"\\\r\n]|\\.)*)"\)\n/gm,
+    fields: 1, pieces: ['    println("', 0, '")\n'] },
+  { pattern: /^    println\(([^\r\n]*)\)\n/gm,
+    fields: 1, pieces: ['    println(', 0, ')\n'] },
+];
+const SHARE_V5_BASE = 224;
+const SHARE_V5_FIELD_END = 254;
+
+function packShareTemplates(text) {
+  const utf8 = new TextEncoder();
+  const matches = [];
+  for (let id = 0; id < SHARE_V5_TEMPLATES.length; id++) {
+    const template = SHARE_V5_TEMPLATES[id];
+    template.pattern.lastIndex = 0;
+    let match;
+    while ((match = template.pattern.exec(text)) !== null) {
+      const fields = match.slice(1).map(field => packShareTokens(utf8.encode(field)));
+      const length = 1 + fields.reduce((sum, field) => sum + field.length + 1, 0);
+      const saved = packShareTokens(utf8.encode(match[0])).length - length;
+      if (saved > 0) {
+        matches.push({ start: match.index, end: match.index + match[0].length, id, fields, saved });
+        // Bound temporary match storage on huge files. Ordinary compression
+        // remains available and is usually best for repetitive large inputs.
+        if (matches.length > 8192) return null;
+      }
+    }
+  }
+  if (matches.length === 0) return null;
+  matches.sort((a, b) => a.start - b.start || b.saved - a.saved || b.end - a.end);
+  const chunks = [];
+  let start = 0;
+  for (const match of matches) {
+    if (match.start < start) continue;
+    if (match.start > start) chunks.push(packShareTokens(utf8.encode(text.slice(start, match.start))));
+    chunks.push(Uint8Array.of(SHARE_V5_BASE + match.id));
+    for (const field of match.fields) {
+      chunks.push(field, Uint8Array.of(SHARE_V5_FIELD_END));
+    }
+    start = match.end;
+  }
+  if (start < text.length) chunks.push(packShareTokens(utf8.encode(text.slice(start))));
+  const out = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+  let offset = 0;
+  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.length; }
+  return out;
+}
+
 function packShareTokens(bytes) {
   const out = new Uint8Array(bytes.length * 2);
   let written = 0;
@@ -1442,7 +1503,7 @@ function packShareTokens(bytes) {
   return out.subarray(0, written);
 }
 
-function unpackShareTokens(bytes, size) {
+function unpackShareTokens(bytes, size, templates = false) {
   const out = new Uint8Array(size);
   let written = 0;
   for (let i = 0; i < bytes.length; i++) {
@@ -1451,6 +1512,40 @@ function unpackShareTokens(bytes, size) {
       if (++i >= bytes.length || written >= size)
         throw new Error("Invalid shared code escape");
       out[written++] = bytes[i];
+    } else if (templates && byte >= SHARE_V5_BASE && byte < SHARE_V5_FIELD_END) {
+      const template = SHARE_V5_TEMPLATES[byte - SHARE_V5_BASE];
+      if (!template) throw new Error("Invalid shared code template");
+      const fields = [];
+      let fieldBytes = 0;
+      for (let field = 0; field < template.fields; field++) {
+        const value = [];
+        while (true) {
+          if (++i >= bytes.length) throw new Error("Incomplete shared template field");
+          const token = bytes[i];
+          if (token === SHARE_V5_FIELD_END) break;
+          if (token === 255) {
+            if (++i >= bytes.length) throw new Error("Incomplete shared template escape");
+            value.push(bytes[i]);
+            fieldBytes++;
+          } else if (token >= 128) {
+            const word = SHARE_V3_DICT[token - 128];
+            if (word === undefined) throw new Error("Invalid shared template field");
+            for (let j = 0; j < word.length; j++) value.push(word.charCodeAt(j));
+            fieldBytes += word.length;
+          } else {
+            value.push(token);
+            fieldBytes++;
+          }
+          if (fieldBytes > size - written) throw new Error("Invalid shared code length");
+        }
+        fields.push(Uint8Array.from(value));
+      }
+      for (const piece of template.pieces) {
+        const value = typeof piece === "number" ? fields[piece] : new TextEncoder().encode(piece);
+        if (written + value.length > size) throw new Error("Invalid shared code length");
+        out.set(value, written);
+        written += value.length;
+      }
     } else if (byte >= 128) {
       const word = SHARE_V3_DICT[byte - 128];
       if (word === undefined || written + word.length > size)
@@ -1469,12 +1564,16 @@ async function encodeSharedCode(text) {
   const bytes = new TextEncoder().encode(text);
   if (bytes.length > SHARE_MAX_BYTES) return null;
   const tokens = packShareTokens(bytes);
+  const templates = packShareTemplates(text);
   const candidates = [{ bytes, format: 0 }, { bytes: tokens, format: 2 }];
+  if (templates !== null) candidates.push({ bytes: templates, format: 6 });
   if (typeof CompressionStream !== "undefined") {
-    await Promise.all([bytes, tokens].map(async (input, index) => {
+    await Promise.all((templates === null ? [bytes, tokens] : [bytes, tokens, templates]).map(async (input, index) => {
       // Raw deflate omits the zlib wrapper; our envelope already checks size
       // and checksum. Fall back to zlib on browsers without raw stream support.
-      for (const [codec, format] of [["deflate-raw", 4 + index], ["deflate", 1 + index * 2]]) {
+      const codecs = index === 2 ? [["deflate-raw", 7]]
+        : [["deflate-raw", 4 + index], ["deflate", 1 + index * 2]];
+      for (const [codec, format] of codecs) {
         try {
           const packed = await readShareStream(new Blob([input]).stream()
             .pipeThrough(new CompressionStream(codec)), SHARE_MAX_BYTES * 2 + 65536);
@@ -1486,40 +1585,68 @@ async function encodeSharedCode(text) {
   }
   candidates.sort((a, b) => a.bytes.length - b.bytes.length || a.format - b.format);
   const best = candidates[0];
-  // One format byte, four length bytes, four checksum bytes. A binary header
-  // is shorter than putting decimal length and hex checksum directly in a URL.
-  const envelope = new Uint8Array(9 + best.bytes.length);
-  const header = new DataView(envelope.buffer);
-  header.setUint8(0, best.format);
-  header.setUint32(1, bytes.length);
-  header.setUint32(5, parseInt(shareChecksum(bytes), 16));
-  envelope.set(best.bytes, 9);
-  return "v3." + b64urlEncode(envelope);
+  // v4 packs the codec into the low three bits of a variable-length size.
+  // Small snippets need just one or two size bytes. Keep all 32 checksum bits.
+  const prefix = [];
+  let value = bytes.length * 8 + best.format;
+  do {
+    const byte = value % 128;
+    value = Math.floor(value / 128);
+    prefix.push(byte | (value ? 128 : 0));
+  } while (value);
+  const envelope = new Uint8Array(prefix.length + 4 + best.bytes.length);
+  envelope.set(prefix);
+  new DataView(envelope.buffer).setUint32(prefix.length, parseInt(shareChecksum(bytes), 16));
+  envelope.set(best.bytes, prefix.length + 4);
+  return (best.format >= 6 ? "v5." : "v4.") + b64urlEncode(envelope);
 }
 
 async function decodeSharedCode(payload) {
   if (payload.length > SHARE_MAX_ENCODED) throw new Error("Shared link is too large");
-  const utf8 = new TextDecoder("utf-8", { fatal: true });
-  if (payload.startsWith("v3.")) {
-    if (!/^v3\.[A-Za-z0-9_-]+$/.test(payload)) throw new Error("Invalid shared link");
+  const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+  if (/^v[345]\./.test(payload)) {
+    if (!/^v[345]\.[A-Za-z0-9_-]+$/.test(payload)) throw new Error("Invalid shared link");
     const envelope = b64urlDecode(payload.slice(3));
-    if (envelope.length < 9) throw new Error("Incomplete shared link header");
     const header = new DataView(envelope.buffer, envelope.byteOffset, envelope.byteLength);
-    const format = header.getUint8(0);
-    const size = header.getUint32(1);
-    const checksum = header.getUint32(5);
-    if (format > 5) throw new Error("Unknown shared link format");
+    let format, size, checksum, offset;
+    if (!payload.startsWith("v3.")) {
+      let value = 0, factor = 1;
+      offset = 0;
+      while (true) {
+        if (offset >= envelope.length || offset >= 4)
+          throw new Error("Invalid shared link header");
+        const byte = envelope[offset++];
+        value += (byte & 127) * factor;
+        if (!(byte & 128)) {
+          if (offset > 1 && byte === 0) throw new Error("Invalid shared link header");
+          break;
+        }
+        factor *= 128;
+      }
+      format = value % 8;
+      size = Math.floor(value / 8);
+      if (offset + 4 > envelope.length) throw new Error("Incomplete shared link header");
+      checksum = header.getUint32(offset);
+      offset += 4;
+    } else {
+      if (envelope.length < 9) throw new Error("Incomplete shared link header");
+      format = header.getUint8(0);
+      size = header.getUint32(1);
+      checksum = header.getUint32(5);
+      offset = 9;
+    }
+    if (format > (payload.startsWith("v5.") ? 7 : 5)) throw new Error("Unknown shared link format");
     if (size > SHARE_MAX_BYTES) throw new Error("Shared code exceeds the 2 MB limit");
-    let bytes = envelope.subarray(9);
-    const tokenized = format === 2 || format === 3 || format === 5;
-    if (format !== 0 && format !== 2) {
+    let bytes = envelope.subarray(offset);
+    const tokenized = format === 2 || format === 3 || format === 5 || format >= 6;
+    if (format !== 0 && format !== 2 && format !== 6) {
       if (typeof DecompressionStream === "undefined")
         throw new Error("This browser cannot open compressed links; ask for a .pie file");
       bytes = await readShareStream(new Blob([bytes]).stream()
         .pipeThrough(new DecompressionStream(format >= 4 ? "deflate-raw" : "deflate")),
         tokenized ? size * 2 : size);
     }
-    if (tokenized) bytes = unpackShareTokens(bytes, size);
+    if (tokenized) bytes = unpackShareTokens(bytes, size, format >= 6);
     if (bytes.length !== size || parseInt(shareChecksum(bytes), 16) !== checksum)
       throw new Error("Shared link is incomplete or damaged");
     return utf8.decode(bytes);
@@ -1562,7 +1689,7 @@ function showShareStatus(message) {
 function cleanShareURL() {
   const url = new URL(window.location.href);
   url.searchParams.delete("code");
-  if (url.hash.startsWith("#code=")) url.hash = "";
+  if (url.hash.startsWith("#code=") || /^#[45]\./.test(url.hash)) url.hash = "";
   return url;
 }
 
@@ -1571,14 +1698,14 @@ async function makeShareURL(text) {
   if (payload === null) return null;
   const url = cleanShareURL();
   // Fragments stay in the browser instead of hitting server request-size limits.
-  url.hash = "code=" + payload;
+  url.hash = payload.slice(1);
   return url.href.length <= SHARE_MAX_URL ? url.href : null;
 }
 
 async function loadSharedCode() {
   const url = new URL(window.location.href);
-  const payload = url.hash.startsWith("#code=")
-    ? url.hash.slice(6) : url.searchParams.get("code");
+  const payload = /^#[45]\./.test(url.hash) ? "v" + url.hash.slice(1)
+    : url.hash.startsWith("#code=") ? url.hash.slice(6) : url.searchParams.get("code");
   if (payload === null) return false;
   try {
     ta.value = await decodeSharedCode(payload);
