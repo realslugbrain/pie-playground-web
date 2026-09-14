@@ -828,13 +828,18 @@ function highlightPie(src) {
 }
 
 function renderHighlight() {
-  backdrop.innerHTML = highlightPie(ta.value);
+  // A pre needs an extra newline to render the textarea's final empty line.
+  backdrop.innerHTML = highlightPie(ta.value + (ta.value.endsWith("\n") ? "\n" : ""));
   syncScroll();
 }
 
 function syncScroll() {
-  backdrop.style.transform =
-    "translate(" + (-ta.scrollLeft) + "px," + (-ta.scrollTop) + "px)";
+  // Scroll the content, not the clipped viewport. Match the textarea's
+  // content viewport so a scrollbar cannot change wrapping between layers.
+  backdrop.style.width = ta.clientWidth + "px";
+  backdrop.style.height = ta.clientHeight + "px";
+  backdrop.scrollLeft = ta.scrollLeft;
+  backdrop.scrollTop = ta.scrollTop;
 }
 
 function autosize() {

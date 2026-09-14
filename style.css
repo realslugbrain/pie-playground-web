@@ -210,7 +210,7 @@ button.theme-toggle:hover {
     tab-size: 4;
     white-space: pre-wrap;
     word-wrap: break-word;
-    will-change: transform;
+    word-break: normal;
 }
 
 #src {
