@@ -175,6 +175,8 @@ end</pre>
 <li><code>pub unsafe fn get_ptr_offset(p: ptr, offset: int) -&gt; int</code> (<code>@intrinsic(&quot;pie.ptr_get_offset&quot;)</code>)</li>
 <li><code>pub struct List[T]</code> (<code>@builtin(&quot;list&quot;)</code>) - A growable array allocated in the active RBMM region.</li>
 <li><code>pub fn new() -&gt; List[T]</code> - Creates an empty list.</li>
+<li><code>pub fn with_capacity(cap: int) -&gt; List[T]</code> - Creates an empty list with storage for at least cap elements pre-allocated (no reallocation until push exceeds cap).</li>
+<li><code>pub fn reserve(self, cap: int) -&gt; void</code> - Pre-allocates storage for at least cap elements (grow-only: never shrinks, never changes length). Pushes up to cap perform zero reallocations.</li>
 <li><code>pub fn push(self, item: T) -&gt; void</code> - Appends an item to the end of the list, growing if needed.</li>
 <li><code>pub fn get(self, index: int) -&gt; Option[T]</code> - Returns the element at index, or None if out of bounds.</li>
 <li><code>pub fn pop(self) -&gt; Option[T]</code> - Removes and returns the last element, or None if empty.</li>
