@@ -552,7 +552,7 @@ end</pre>
 </details>
 <details>
 <summary>pie::std::string</summary>
-<p>UTF-8 string conveniences. Import this module to enable the string methods. Search positions and lengths are bytes. Returned substrings are copied into NUL-terminated strings; they are not borrowed views. Whitespace means ASCII space, tab, LF, CR, vertical tab, or form feed. No locale names are built in.</p>
+<p>UTF-8 string conveniences.</p>
 <ul>
 <li><code>pub fn find(self: string, needle: string) -&gt; Option[int] ![Pure]</code> - Returns the first matching byte offset, or None. An empty needle matches at 0.</li>
 <li><code>pub fn rfind(self: string, needle: string) -&gt; Option[int] ![Pure]</code> - Returns the last matching byte offset, or None. An empty needle matches at len().</li>
@@ -1779,7 +1779,7 @@ $("link").addEventListener("click", async () => {
     if (url === null) {
       window.history.replaceState(null, "", cleanShareURL());
       saveCodeFile(source);
-      showShareStatus("Code is too large for a reliable link. Saved playground.pie instead — send the file and have the recipient use [open].");
+      showShareStatus("Code is too large for a reliable link. Saved playground.pie instead - send the file and have the recipient use [open].");
     } else {
       window.history.replaceState(null, "", url);
       await copyShareLink(url);
